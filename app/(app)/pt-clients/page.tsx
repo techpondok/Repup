@@ -1,0 +1,45 @@
+import Link from "next/link";
+import { getTenantContext } from "@/lib/tenant";
+import { createClient } from "@/lib/supabase/server";
+import { PageHeader, Card, EmptyState } from "@/components/ui/layout-bits";
+import { Badge } from "@/components/ui/badge";
+import { AddPtClientModal } from "@/components/personal-training/add-pt-client-modal";
+import { SchedulePtModal } from "@/components/personal-training/schedule-pt-modal";
+import { PtCalendar } from "@/components/personal-training/pt-calendar";
+import { formatDate } from "@/lib/format";
+
+const demoClients = [["Yudha Wahyu", "Andi Wijaya", "PT 12 Sessions", "4 / 12", "30 Nov 2026"], ["Siti Rahma", "Andi Wijaya", "PT 8 Sessions", "6 / 8", "18 Okt 2026"], ["Budi Santoso", "Raka Pratama", "PT 12 Sessions", "10 / 12", "12 Des 2026"]];
+
+function ModuleTabs({ view }: { view: string }) { return <div className="mb-4 flex gap-1 border-b border-line"><Link href="/pt-clients" className={`px-3 py-2 text-sm ${view !== "calendar" ? "border-b-2 border-primary font-medium text-primary" : "text-ink-muted"}`}>Clients</Link><Link href="/pt-clients?view=calendar" className={`px-3 py-2 text-sm ${view === "calendar" ? "border-b-2 border-primary font-medium text-primary" : "text-ink-muted"}`}>Calendar</Link></div>; }
+
+
+function DemoPtClients({ view, role }: { view: string; role?: string }) {
+  const visible = role === "TRAINER" ? demoClients.slice(0, 2) : demoClients;
+  return <div><PageHeader title="PT Clients" description={role === "TRAINER" ? "Workspace Andi Wijaya · hanya client Personal Training yang ditugaskan." : "Kelola seluruh hubungan member dan trainer Personal Training."} /><ModuleTabs view={view} />{view === "calendar" ? <Card><div className="space-y-3"><p className="text-sm font-medium text-ink">{role === "TRAINER" ? "Jadwal Saya" : "Semua Jadwal PT"} · Minggu ini</p>{visible.map(([member, trainer], index) => <Link key={member} href={`/pt-clients/${member.toLowerCase().replaceAll(" ", "-")}`} className="block border-l-2 border-primary px-3 py-2 text-sm text-ink hover:bg-canvas">{index === 0 ? "10 Sep" : "11 Sep"} · {index === 0 ? "18:00" : "10:00"} · {member} · Trainer: {trainer}</Link>)}</div></Card> : <Card><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-sm"><thead><tr className="border-b border-line text-left text-xs text-ink-faint"><th className="px-4 py-3">Member</th><th className="px-4 py-3">Trainer</th><th className="px-4 py-3">Package</th><th className="px-4 py-3">Sessions</th><th className="px-4 py-3">Next Session</th><th className="px-4 py-3">Expiry</th><th className="px-4 py-3">Status</th></tr></thead><tbody>{visible.map(([member, trainer, plan, sessions, expiry], index) => <tr key={member} className="border-b border-line last:border-0"><td className="px-4 py-3"><Link href={`/pt-clients/${member.toLowerCase().replaceAll(" ", "-")}`} className="font-medium text-ink hover:text-primary">{member}</Link></td><td className="px-4 py-3 text-ink-muted">{trainer}</td><td className="px-4 py-3 text-ink-muted">{plan}</td><td className="px-4 py-3">{sessions}</td><td className="px-4 py-3 text-ink-muted">{index === 0 ? "10 Sep · 18:00" : "11 Sep · 10:00"}</td><td className="px-4 py-3 text-ink-muted">{expiry}</td><td className="px-4 py-3"><Badge tone="success">active</Badge></td></tr>)}</tbody></table></div></Card>}<p className="mt-4 text-xs text-ink-faint">Demo memakai data contoh lokal. Assignment nyata menggunakan Members dan Plans &amp; Packages.</p></div>;
+}
+
+export default async function PtClientsPage({ searchParams }: { searchParams: Promise<{ view?: string; date?: string }> }) {
+  const ctx = await getTenantContext(); const params = await searchParams; const view = params.view === "calendar" ? "calendar" : "clients";
+  if (ctx.isDemo) return <DemoPtClients view={view} role={ctx.demoRole} />;
+  const supabase = await createClient();
+  const { data: trainerRoles } = await supabase.from("trainer_roles").select("trainer_id").eq("role", "TRAINER");
+  const trainerIds = (trainerRoles ?? []).map((row: any) => row.trainer_id);
+  let currentTrainerId = "";
+  let clientQuery = supabase.from("pt_client_assignments").select("*, members(full_name, member_code), trainers(full_name), branches(name)").eq("organization_id", ctx.organization.id).order("created_at", { ascending: false });
+  if (!ctx.isOrgWide) { const { data: currentTrainer } = await supabase.from("trainers").select("id").eq("organization_id", ctx.organization.id).eq("user_id", ctx.userId).maybeSingle(); if (currentTrainer) { currentTrainerId = currentTrainer.id; clientQuery = clientQuery.eq("trainer_id", currentTrainer.id); } }
+  if (ctx.branch) clientQuery = clientQuery.eq("location_id", ctx.branch.id);
+  const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? new Date(`${params.date}T00:00:00`) : new Date();
+  const monday = new Date(date); monday.setDate(date.getDate() - ((date.getDay() + 6) % 7)); const nextMonday = new Date(monday); nextMonday.setDate(monday.getDate() + 7);
+  const [{ data: clients }, { data: members }, { data: trainers }, { data: plans }, { data: sessions }] = await Promise.all([
+    clientQuery,
+    supabase.from("members").select("id, full_name, member_code").eq("organization_id", ctx.organization.id).eq("status", "active").order("full_name").limit(200),
+    trainerIds.length ? supabase.from("trainers").select("id, full_name").eq("organization_id", ctx.organization.id).eq("is_active", true).in("id", trainerIds).order("full_name") : Promise.resolve({ data: [] as any[] }),
+    supabase.from("membership_plans").select("id, name, price, visit_limit").eq("organization_id", ctx.organization.id).eq("is_active", true).order("name"),
+    supabase.from("pt_sessions").select("*, members(full_name), trainers(full_name)").eq("organization_id", ctx.organization.id).gte("session_date", monday.toISOString().slice(0, 10)).lt("session_date", nextMonday.toISOString().slice(0, 10)).order("session_date").order("start_time").limit(100),
+  ]);
+  const locationId = ctx.branch?.id ?? ctx.branches[0]?.id ?? "";
+  const assignmentOptions = (clients ?? []).map((client: any) => ({ id: client.id, member: client.members?.full_name ?? "Member", trainer: client.trainers?.full_name ?? "Trainer", locationId: client.location_id, location: client.branches?.name ?? "Lokasi" }));
+  const canSchedule = ctx.isOrgWide || trainerIds.includes(currentTrainerId);
+  const actions = <div className="flex gap-2">{canSchedule && locationId && <SchedulePtModal assignments={assignmentOptions} locationId={locationId} />}{ctx.isOrgWide && locationId && <AddPtClientModal organizationId={ctx.organization.id} locationId={locationId} members={(members ?? []).map((m: any) => ({ id: m.id, name: `${m.full_name} · ${m.member_code}` }))} coaches={(trainers ?? []).map((t: any) => ({ id: t.id, name: t.full_name }))} plans={plans ?? []} />}</div>;
+  return <div><PageHeader title="PT Clients" description="Trainer workspace untuk client, paket, dan sesi Personal Training." actions={actions} /><ModuleTabs view={view} />{view === "calendar" ? <PtCalendar sessions={sessions ?? []} weekStart={monday} /> : <Card>{!clients?.length ? <EmptyState title="Belum ada PT client" description="Assign member existing ke trainer untuk mulai Personal Training." /> : <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-sm"><thead><tr className="border-b border-line text-left text-xs text-ink-faint"><th className="px-4 py-3">Member</th><th className="px-4 py-3">Trainer</th><th className="px-4 py-3">Package</th><th className="px-4 py-3">Sessions</th><th className="px-4 py-3">Next Session</th><th className="px-4 py-3">Expiry</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead><tbody>{clients.map((client: any) => <tr key={client.id} className="border-b border-line last:border-0"><td className="px-4 py-3"><Link href={`/pt-clients/${client.id}`} className="font-medium text-ink hover:text-primary">{client.members?.full_name}</Link><p className="text-xs text-ink-faint">{client.members?.member_code}</p></td><td className="px-4 py-3 text-ink-muted">{client.trainers?.full_name}</td><td className="px-4 py-3 text-ink-muted">{client.package_name ?? "PT Package"}</td><td className="px-4 py-3">{client.sessions_used} / {client.sessions_total} <span className="text-xs text-ink-faint">({client.sessions_total - client.sessions_used} tersisa)</span></td><td className="px-4 py-3 text-ink-muted">-</td><td className="px-4 py-3 text-ink-muted">{formatDate(client.end_date)}</td><td className="px-4 py-3"><Badge tone={client.status === "active" ? "success" : "neutral"}>{client.status}</Badge></td><td className="px-4 py-3"><Link href={`/pt-clients/${client.id}`} className="text-xs text-primary hover:underline">Detail &amp; edit</Link></td></tr>)}</tbody></table></div>}</Card>}<p className="mt-4 text-xs text-ink-faint">PT client memakai data Members yang sama; tidak ada database member terpisah.</p><Link href="/trainers" className="mt-2 inline-block text-xs text-primary hover:underline">← Kembali ke Trainer</Link></div>;
+}
