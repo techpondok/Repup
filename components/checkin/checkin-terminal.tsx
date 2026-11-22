@@ -78,7 +78,7 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const frameRef = useRef<number | null>(null);
+  const scanTimer = useRef<number | null>(null);
   const scanningRef = useRef(false);
 
   useEffect(() => {
@@ -90,7 +90,8 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
     cameraRequest.current++;
     cameraStarting.current = false;
     scanningRef.current = false;
-    if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    if (scanTimer.current !== null) window.clearTimeout(scanTimer.current);
+    scanTimer.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -151,9 +152,9 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
             return;
           }
         } catch { /* Camera frames may fail while autofocus adjusts. */ }
-        if (attempt === cameraRequest.current) frameRef.current = requestAnimationFrame(scan);
+        if (attempt === cameraRequest.current) scanTimer.current = window.setTimeout(scan, 200);
       };
-      frameRef.current = requestAnimationFrame(scan);
+      void scan();
     } catch (error) {
       if (attempt !== cameraRequest.current) return;
       stopCamera();

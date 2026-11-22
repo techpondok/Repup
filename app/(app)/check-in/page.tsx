@@ -26,7 +26,7 @@ export default async function CheckInPage() {
   return (
     <div>
       <PageHeader title="Check-in" description="Validasi keanggotaan member saat masuk ke gym." />
-      {ctx.isDemo ? <DemoCheckinTerminal {...props} /> : <CheckinTerminal {...props}
+      {ctx.isDemo ? <DemoCheckinTerminal key={ctx.branch.id} {...props} /> : <CheckinTerminal key={ctx.branch.id} {...props}
         initialRecent={recent?.status === "fulfilled" ? recent.value : []}
         initialActive={active?.status === "fulfilled" ? active.value : []}
         historyUnavailable={recent?.status === "rejected"} activeUnavailable={active?.status === "rejected"} />}
