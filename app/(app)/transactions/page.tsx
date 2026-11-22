@@ -14,6 +14,17 @@ export default async function TransactionsPage({
   searchParams: Promise<{ status?: string; method?: string }>;
 }) {
   const ctx = await getTenantContext();
+  if (ctx.isDemo) {
+    return (
+      <div>
+        <PageHeader title="Transaksi" description="Riwayat transaksi per cabang." />
+        <Card>
+          <EmptyState title="Data tersedia di akun gym" />
+        </Card>
+      </div>
+    );
+  }
+
   const sp = await searchParams;
   const supabase = await createClient();
 

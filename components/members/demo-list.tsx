@@ -12,6 +12,7 @@ import { FollowUpForm, MemberForm, RenewalForm } from "./demo-forms";
 import { ImportMembers } from "./demo-import";
 import { PlanDialog } from "./demo-plan";
 import { useMemberDemo } from "./demo-provider";
+import { useBranchDemo } from "@/components/branches/demo-provider";
 import type { DemoScope } from "./demo-scope";
 import { Avatar, dateLabel, dateTimeLabel, MemberTable, Stats, Status } from "./demo-ui";
 
@@ -20,7 +21,9 @@ const expirationGroups = ["Expiring in 7 Days", "Expiring Today", "Expired"];
 const statuses = ["Active", "Expiring Soon", "Frozen", "Expired", "Scheduled", "No Membership"];
 type Dialog = { type: "add" | "import" | "plan" | "limit" | "reset" } | { type: "edit" | "renew" | "follow"; member: Member };
 
-export function DemoMemberList({ expiring = false, ...scope }: DemoScope & { expiring?: boolean }) {
+export function DemoMemberList({ expiring = false, ...initialScope }: DemoScope & { expiring?: boolean }) {
+  const branch = useBranchDemo();
+  const scope = branch ? { ...initialScope, canEdit: initialScope.canEdit && !!branch.scopedIds.length, branchIds: branch.scopedIds, branchId: branch.scope?.id ?? branch.scopedIds[0] ?? "" } : initialScope;
   const demo = useMemberDemo();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("");

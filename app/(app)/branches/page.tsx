@@ -5,16 +5,16 @@ import { PageHeader, Card, EmptyState } from "@/components/ui/layout-bits";
 import { Badge } from "@/components/ui/badge";
 import { NewBranchForm } from "@/components/branches/new-branch-form";
 import { CreateFormModal } from "@/components/ui/create-form-modal";
+import { BranchWorkspace } from "@/components/branches/workspace";
 
 export default async function BranchesPage() {
   const ctx = await getTenantContext();
-  const supabase = await createClient();
-
-  const { data: branches } = await supabase
-    .from("branches")
-    .select("*")
-    .eq("organization_id", ctx.organization.id)
-    .order("created_at");
+  if (ctx.isDemo) return <BranchWorkspace />;
+  const branches = (await (await createClient())
+        .from("branches")
+        .select("*")
+        .eq("organization_id", ctx.organization.id)
+        .order("created_at")).data;
 
   return (
     <div>

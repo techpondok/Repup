@@ -8,6 +8,17 @@ import { CreateFormModal } from "@/components/ui/create-form-modal";
 
 export default async function CoachesPage() {
   const ctx = await getTenantContext();
+  if (ctx.isDemo) {
+    return (
+      <div>
+        <PageHeader title="Coach" description="Coach untuk kelas, jadwal group, dan attendance." />
+        <Card>
+          <EmptyState title="Data tersedia di akun gym" />
+        </Card>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const { data: roleRows } = await supabase.from("trainer_roles").select("trainer_id").eq("role", "COACH");
   const coachIds = (roleRows ?? []).map((row: any) => row.trainer_id);

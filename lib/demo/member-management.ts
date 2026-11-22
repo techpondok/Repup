@@ -23,12 +23,14 @@ export const packageFor = (id?: string) => packages.find(plan => plan.id === id)
 export type Membership = { id: string; packageId: string; start: string; end: string; price: number; method: string; frozen: boolean; supersededOn?: string };
 export type Profile = { name: string; phone: string; email: string; birth: string; gender: string; address: string; emergency: string; photo: string };
 export type Activity = { id: string; type: string; description: string; at: string };
-export type Visit = { id: string; at: string; out?: string };
+export type Visit = { id: string; at: string; out?: string; branchId?: string };
 export type FollowUp = { staff: string; method: string; date: string; notes: string; next: string; status: string };
 export type PtBooking = { id: string; at: string; createdAt: string; status: "Reserved" | "Completed" | "Cancelled" };
 export type Member = Profile & {
   id: string;
   branchId: string;
+  allowedBranchIds?: string[];
+  lastVisitedBranchId?: string;
   joined: string;
   memberships: Membership[];
   visits: Visit[];

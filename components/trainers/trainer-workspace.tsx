@@ -1,5 +1,8 @@
 "use client";
 
+import { useBranchDemo } from "@/components/branches/demo-provider";
+import { trainerBranchIds } from "@/lib/demo/branches";
+
 import { useRef, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import {
@@ -41,7 +44,9 @@ type TrainerWorkspaceProps = {
 export function TrainerWorkspace({ trainers, canManage, canEditSessions, actorName, demo, error }: TrainerWorkspaceProps) {
   const [liveRows, setLiveRows] = useState(trainers);
   const { details: sharedDetails, setDetails: setLocalDetails } = useTrainerDemo();
-  const localDetails = !demo || error ? [] : !canManage && canEditSessions ? sharedDetails.slice(0, 1) : sharedDetails;
+  const branchScope = useBranchDemo();
+  const scopedDetails = branchScope ? sharedDetails.filter(({ trainer }) => trainerBranchIds(trainer.id, trainer.branchIds).some(id => branchScope.scopedIds.includes(id))) : sharedDetails;
+  const localDetails = !demo || error ? [] : !canManage && canEditSessions ? scopedDetails.slice(0, 1) : scopedDetails;
   const [loadError, setLoadError] = useState(error ?? "");
   const [permissions, setPermissions] = useState({ canManage, canEditSessions });
   const [refreshing, setRefreshing] = useState(false);
@@ -108,9 +113,12 @@ export function TrainerWorkspace({ trainers, canManage, canEditSessions, actorNa
   async function saveTrainer(data: FormData) {
     const editingId = editing && editing !== "new" ? editing.id : null;
     if (demo) {
+      const assigned = branchScope ? data.getAll("demoBranchIds").map(String).filter(id => branchScope.allowed.some(branch => branch.id === id)) : [];
+      if (branchScope && !assigned.length) return { error: "Assign at least one branch." };
       const result = await saveDemoTrainer(sharedDetails, editingId, data);
       if (result.error) return result;
-      setLocalDetails(result.data);
+      setLocalDetails(result.data.map(item => item.trainer.id === result.id && branchScope
+        ? { ...item, trainer: { ...item.trainer, branchIds: assigned } } : item));
     } else {
       const result = await saveManagedTrainer(editingId, data);
       if (result.error) return result;
@@ -222,6 +230,8 @@ export function TrainerWorkspace({ trainers, canManage, canEditSessions, actorNa
     </TrainerDrawer>}
     {editing && <TrainerDrawer title={editing === "new" ? "Add Trainer" : "Edit Trainer"} onClose={() => { if (!savingTrainer) setEditing(null); }}>
       <ManagedTrainerForm key={editing === "new" ? "new" : editing.id} trainer={editing === "new" ? undefined : editing}
+        branches={demo ? branchScope?.allowed.filter(branch => branch.status === "active" || (editing !== "new" && trainerBranchIds(editing.id, editing.branchIds).includes(branch.id))) : undefined}
+        selectedBranches={editing === "new" ? branchScope?.scopedIds.slice(0, 1) : trainerBranchIds(editing.id, editing.branchIds)}
         sessions={editing === "new" ? undefined : selectedDetail?.sessions}
         packageNames={editing === "new" ? [] : selectedDetail?.packages?.map(plan => plan.name)}
         onSave={saveTrainer} onClose={() => setEditing(null)} onPendingChange={setSavingTrainer} />

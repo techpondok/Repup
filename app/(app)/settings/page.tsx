@@ -3,6 +3,7 @@ import { PageHeader, Card, SectionLabel } from "@/components/ui/layout-bits";
 import { OrganizationSettingsForm, GymSettingsForm } from "@/components/settings/settings-forms";
 import { PtSettingsForm } from "@/components/personal-training/pt-settings";
 import { loadPtSettings } from "@/app/actions/pt-bookings";
+import { LinkButton } from "@/components/ui/button";
 
 export default async function SettingsPage() {
   const ctx = await getTenantContext();
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
       <PageHeader title="Pengaturan" description="Kelola profil organisasi, gym, dan preferensi lainnya." />
 
       <div className="space-y-6">
+        {ctx.isDemo && ctx.demoRole === "OWNER" && <div className="flex flex-wrap gap-2"><LinkButton href="/branches" variant="secondary">Branch Management</LinkButton><LinkButton href="/dashboard/settings/subscription" variant="secondary">Subscription</LinkButton></div>}
         <Card className="p-6">
           <SectionLabel>Organisasi</SectionLabel>
           <OrganizationSettingsForm organization={ctx.organization} />

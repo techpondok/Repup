@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useBranchDemo } from "@/components/branches/demo-provider";
 import { Card, StatCard } from "@/components/ui/layout-bits";
 import { RevenueChart } from "@/components/reports/charts";
 import { Activity, Users, IdCard, Wallet } from "lucide-react";
@@ -13,7 +16,8 @@ export default function DemoDashboard({ ctx }: { ctx: TenantContext }) {
   const isCoach = role === "COACH";
   const isTrainer = role === "TRAINER";
   const isMember = role === "MEMBER";
-  const location = ctx.branch?.name ?? "Semua lokasi";
+  const scope = useBranchDemo();
+  const location = scope ? scope.scope?.name ?? "Tidak ada cabang aktif" : ctx.branch?.name ?? "Semua lokasi";
   const stats = isTrainer ? [["My PT Clients", "2"], ["Sessions Today", "2"], ["This Week", "6"], ["Next Session", "18:00"]] : isCoach ? [["Kelas Hari Ini", "3"], ["Member Kelas", "34"], ["Attendance Hari Ini", "27"], ["Upcoming Class", "17:00"]] : isMember ? [["Membership", "Active"], ["Kelas Diikuti", "12"], ["Check-in Bulan Ini", "8"], ["Sesi Tersisa", "6"]] : role === "MANAGER" ? [["Check-in Hari Ini", "21"], ["Member Aktif", "146"], ["Renewal Opportunity", "12"], ["Pendapatan Bulan Ini", "Rp16,4jt"]] : [["Check-in Hari Ini", "63"], ["Member Aktif", "427"], ["Renewal Opportunity", "43"], ["Pendapatan Bulan Ini", "Rp48,25jt"]];
 
   return <div>

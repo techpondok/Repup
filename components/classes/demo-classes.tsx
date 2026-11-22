@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useBranchDemo } from "@/components/branches/demo-provider";
 import Link from "next/link";
 import { useClasses } from "@/components/member/classes/class-provider";
 import { ScheduleCalendar } from "@/components/ui/schedule-calendar";
@@ -12,10 +13,11 @@ import { classAvailability, classDate, classDateKey, classTime, isPublishedClass
 
 export function DemoClasses({ view, canManage, canView, branchIds }: { view: string; canManage: boolean; canView: boolean; branchIds: string[] }) {
   const { state } = useClasses();
+  const branchScope = useBranchDemo()?.scopedIds ?? branchIds;
   const [now] = useState(() => Date.now());
   if (!canView) return <EmptyState title="Classes are unavailable for this demo role" />;
   const today = classDateKey(new Date(now));
-  const rows = state.schedules.filter(item => item.branchId && branchIds.includes(item.branchId)
+  const rows = state.schedules.filter(item => item.branchId && branchScope.includes(item.branchId)
     && (canManage || isPublishedClass(item)) && classDateKey(item.startsAt) >= today).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const tableRows = view === "bookings" ? rows.filter(isPublishedClass) : rows;
 

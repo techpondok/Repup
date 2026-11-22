@@ -11,10 +11,13 @@ import { activity, addDays, current, status, type PtBooking } from "@/lib/demo/m
 import { ptPackages, ptSlots, trainers } from "@/lib/member/pt";
 import { Field, Footer } from "./demo-forms";
 import { useMemberDemo } from "./demo-provider";
+import { useBranchDemo } from "@/components/branches/demo-provider";
 import type { DemoScope } from "./demo-scope";
 import { dateTimeLabel, MemberTable } from "./demo-ui";
 
-export function DemoMemberPT({ id, view, ...scope }: DemoScope & { id: string; view: "calendar" | "bookings" }) {
+export function DemoMemberPT({ id, view, ...initialScope }: DemoScope & { id: string; view: "calendar" | "bookings" }) {
+  const branch = useBranchDemo();
+  const scope = branch ? { ...initialScope, branchIds: branch.scopedIds, branchId: branch.scope?.id ?? branch.scopedIds[0] ?? "" } : initialScope;
   const demo = useMemberDemo();
   const [selected, setSelected] = useState<PtBooking | null>(null);
   const [booking, setBooking] = useState(false);

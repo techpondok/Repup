@@ -7,12 +7,31 @@ import { Badge, MembershipStatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Plus } from "lucide-react";
 import { MembershipActions } from "@/components/memberships/membership-actions";
+import { packages } from "@/lib/demo/member-management";
 
 const UNIT_LABEL: Record<string, string> = { day: "hari", month: "bulan", year: "tahun", visit: "kunjungan" };
 const ACCESS_LABEL: Record<string, string> = { single: "1 Cabang", selected: "Cabang Terpilih", all: "Semua Cabang" };
 
 export default async function MembershipsPage() {
   const ctx = await getTenantContext();
+  if (ctx.isDemo) {
+    return (
+      <div>
+        <PageHeader title="Membership" description="Contoh paket membership gym." />
+        <SectionLabel>Paket Membership</SectionLabel>
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {packages.map((plan) => (
+            <Card key={plan.id} className="p-5">
+              <p className="font-medium text-ink">{plan.name}</p>
+              <p className="num mt-2 text-xl font-semibold text-ink">{formatCurrency(plan.price)}</p>
+              <p className="mt-1 text-xs text-ink-faint">{plan.days} hari</p>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
 
   const { data: plans } = await supabase

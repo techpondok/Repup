@@ -1,15 +1,24 @@
 "use client";
 
 import { CheckinTerminal } from "./checkin-terminal";
+import { useBranchDemo } from "@/components/branches/demo-provider";
+import { EmptyState } from "@/components/ui/layout-bits";
 import { useMemberDemo } from "@/components/members/demo-provider";
 import { activity, current, packageFor, status } from "@/lib/demo/member-management";
 import type { CheckInResult } from "@/app/actions/checkin";
 import type { AttendanceDirection } from "@/lib/checkin/service";
 
 export function DemoCheckinTerminal(props: { organizationId: string; branchId: string; branchName: string }) {
+  const branch = useBranchDemo();
+  if (branch && !branch.scope) return <EmptyState title="Pilih cabang aktif untuk check-in." />;
+  return <ScopedTerminal key={branch?.scope?.id ?? props.branchId} {...props} branchId={branch?.scope?.id ?? props.branchId} branchName={branch?.scope?.name ?? props.branchName} />;
+}
+
+function ScopedTerminal(props: { organizationId: string; branchId: string; branchName: string }) {
   const demo = useMemberDemo();
-  const members = demo.members.filter(member => member.branchId === props.branchId);
-  const rows = members.flatMap(member => member.visits.map(visit => ({
+  const permitted = (member: (typeof demo.members)[number]) => (member.allowedBranchIds ?? [member.branchId]).includes(props.branchId);
+  const members = demo.members.filter(permitted);
+  const rows = demo.members.flatMap(member => member.visits.filter(visit => (visit.branchId ?? member.branchId) === props.branchId).map(visit => ({
     id: visit.id, member_id: member.id, occurred_at: visit.at, check_out_at: visit.out,
     attendance_status: visit.out ? "completed" : "active", status: "success",
     members: { full_name: member.name, member_code: member.id },
@@ -19,8 +28,9 @@ export function DemoCheckinTerminal(props: { organizationId: string; branchId: s
     let result: CheckInResult = { result_status: "denied", denial_reason: "Member atau QR demo tidak dikenali di cabang ini." };
     const value = identifier.replace(/^member-demo:/, "").toLowerCase();
     demo.update(items => items.map(member => {
-      if (member.branchId !== props.branchId || ![member.id, member.phone].some(item => item.toLowerCase() === value)) return member;
-      const visit = member.visits.find(item => !item.out);
+      if (![member.id, member.phone].some(item => item.toLowerCase() === value)) return member;
+      if (!permitted(member)) { result = { result_status: "denied", denial_reason: "Membership tidak berlaku di cabang ini." }; return member; }
+      const visit = member.visits.find(item => !item.out && (item.branchId ?? member.branchId) === props.branchId);
       const membership = current(member, demo.today);
       const at = new Date().toISOString();
       const details = { member_name: member.name, plan_name: packageFor(membership?.packageId)?.name, valid_until: membership?.end };
@@ -43,7 +53,7 @@ export function DemoCheckinTerminal(props: { organizationId: string; branchId: s
       }
       const id = crypto.randomUUID();
       result = { ...details, result_status: "success", action: "check_in", attendanceId: id, checkInAt: at };
-      return activity({ ...member, visits: [{ id, at }, ...member.visits] }, "Check-in", "Check-in dari terminal demo", at);
+      return activity({ ...member, lastVisitedBranchId: props.branchId, visits: [{ id, at, branchId: props.branchId }, ...member.visits] }, "Check-in", "Check-in dari terminal demo", at);
     }));
     return result;
   }

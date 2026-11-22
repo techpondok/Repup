@@ -22,6 +22,17 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default async function EquipmentPage() {
   const ctx = await getTenantContext();
+  if (ctx.isDemo) {
+    return (
+      <div>
+        <PageHeader title="Peralatan" description="Inventaris peralatan per cabang." />
+        <Card>
+          <EmptyState title="Data tersedia di akun gym" />
+        </Card>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
 
   if (!ctx.branch) {

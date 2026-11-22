@@ -1,4 +1,5 @@
 import { calendarDayKey } from "./calendar";
+import { trainerBranchIds } from "./demo/branches";
 import { demoMembers } from "./store/demo-members";
 import {
   isTrainerPhoto, memberScheduleError, openSession, trainerAllowsSlot, trainerAvailabilityError, trainerFormValues, trainerOverlapError, validTrainerSlot,
@@ -52,11 +53,15 @@ export function createTrainerDemo(now = Date.now()): DemoTrainer[] {
       trainer,
       members: members.map(member => ({ id: member.id, name: member.full_name, photo: null, packageName: null,
         status: "active", lastSession: null, nextSession: null })),
-      sessions: members.map((member, memberIndex) => {
+      sessions: [...members.map((member, memberIndex) => {
         const [start, end] = index === 1 ? ["14:00", "15:00"] : memberIndex === 0 ? ["10:00", "11:00"] : ["09:00", "10:00"];
-        return { id: `demo-session-${index + 1}-${memberIndex + 1}`, date, memberName: member.full_name, start, end,
+        return { id: `demo-session-${index + 1}-${memberIndex + 1}`, date, branchId: trainerBranchIds(trainer.id)[0], memberName: member.full_name, start, end,
           status: "confirmed", scheduledAt: new Date(`${date}T${start}:00+07:00`).toISOString() };
-      }),
+      }), ...(index < 2 ? Array.from({ length: 20 }, (_, dayIndex): TrainerSession => {
+        const date = `2026-11-${String(dayIndex + 2).padStart(2, "0")}`;
+        return { id: `demo-completed-${index + 1}-${dayIndex + 1}`, date, branchId: trainerBranchIds(trainer.id)[0], memberName: members[dayIndex % members.length].full_name,
+          start: "10:00", end: "11:00", status: "completed", scheduledAt: `${date}T03:00:00.000Z` };
+      }) : [])],
     });
   });
 }

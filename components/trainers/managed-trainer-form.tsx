@@ -15,10 +15,12 @@ export function TrainerPhoto({ name, photo }: { name: string; photo?: string | n
   ) : <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-tint text-xs font-semibold text-primary">{name.split(/\s+/).slice(0, 2).map(word => word[0]).join("").toUpperCase()}</span>;
 }
 
-export function ManagedTrainerForm({ trainer, packageNames = [], sessions = [], onSave, onClose, onPendingChange }: {
+export function ManagedTrainerForm({ trainer, packageNames = [], sessions = [], branches, selectedBranches = [], onSave, onClose, onPendingChange }: {
   trainer?: ManagedTrainer;
   packageNames?: string[];
   sessions?: TrainerSession[];
+  branches?: { id: string; name: string }[];
+  selectedBranches?: string[];
   onSave: (formData: FormData) => Promise<{ error?: string }>;
   onClose: () => void;
   onPendingChange: (pending: boolean) => void;
@@ -56,6 +58,8 @@ export function ManagedTrainerForm({ trainer, packageNames = [], sessions = [], 
 
   return <form onSubmit={submit} className="space-y-4">
     <fieldset disabled={pending} className="min-w-0 space-y-4">
+      {branches && <fieldset className="flex flex-wrap gap-4 rounded-lg border border-line p-3"><legend className="px-1 text-sm font-medium">Assigned branches</legend>{branches.map(branch =>
+        <label key={branch.id} className="flex items-center gap-2 text-sm"><input name="demoBranchIds" type="checkbox" value={branch.id} defaultChecked={selectedBranches.includes(branch.id)} />{branch.name}</label>)}</fieldset>}
       {trainer?.photo && <TrainerPhoto name={trainer.name} photo={trainer.photo} />}
       <label className="block text-sm">Profile Photo<Input className="mt-1" name="photo" type="file" accept="image/jpeg,image/png,image/webp" /><span className="mt-1 block text-xs text-ink-muted">JPEG, PNG or WebP. Up to 512 KB.</span></label>
       <div className="grid gap-4 sm:grid-cols-2">

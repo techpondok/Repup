@@ -1,7 +1,7 @@
+import { DemoBranchPT } from "@/components/personal-training/demo-branch-pt";
+import { hasDemoPermission } from "@/lib/demo/roles";
 import { DemoMemberPT } from "@/components/members/demo-pt";
 import { memberDemoScope } from "@/components/members/demo-scope";
-import { ScheduleCalendar } from "@/components/ui/schedule-calendar";
-import { calendarDayKey } from "@/lib/calendar";
 import { DataTable } from "@/components/ui/data-table";
 import Link from "next/link";
 import { getTenantContext } from "@/lib/tenant";
@@ -15,7 +15,6 @@ import { PtBookingManagement } from "@/components/personal-training/pt-booking-m
 import { loadStaffPt } from "@/app/actions/pt-bookings";
 import { formatDate } from "@/lib/format";
 
-const demoClients = [["Yudha Wahyu", "Andi Wijaya", "PT 12 Sessions", "4 / 12", "30 Nov 2026"], ["Siti Rahma", "Andi Wijaya", "PT 8 Sessions", "6 / 8", "18 Okt 2026"], ["Budi Santoso", "Raka Pratama", "PT 12 Sessions", "10 / 12", "12 Des 2026"]];
 
 const ptTabs = [{ view: "clients", label: "Clients", href: "/pt-clients" }, { view: "calendar", label: "Calendar", href: "/pt-clients?view=calendar" }, { view: "bookings", label: "PT Bookings", href: "/pt-clients?view=bookings" }];
 function ModuleTabs({ view }: { view: string }) {
@@ -25,14 +24,11 @@ function ModuleTabs({ view }: { view: string }) {
 }
 
 
-function DemoPtClients({ view, role, now }: { view: string; role?: string; now:number }) {
-  const visible = role === "TRAINER" ? demoClients.slice(0, 2) : demoClients;
-  return <div><PageHeader title="PT Clients" description={role === "TRAINER" ? "Workspace Andi Wijaya · hanya client Personal Training yang ditugaskan." : "Kelola seluruh hubungan member dan trainer Personal Training."} /><ModuleTabs view={view} />{view === "calendar" ? <ScheduleCalendar title={role === "TRAINER" ? "Jadwal PT Saya" : "Kalender PT"} events={visible.map(([member,trainer],index)=>({id:`demo-pt-${index}`,title:member,date:calendarDayKey(new Date(now+index*86400000)),time:index===0?"18:00":"10:00",description:`Trainer: ${trainer}`,status:"scheduled",href:`/pt-clients/${member.toLowerCase().replaceAll(" ","-")}`}))}/> : <Card><div className="overflow-x-auto"><DataTable className="w-full min-w-[850px] text-sm"><thead><tr className="border-b border-line text-left text-xs text-ink-faint"><th className="px-4 py-3">Member</th><th className="px-4 py-3">Trainer</th><th className="px-4 py-3">Package</th><th className="px-4 py-3">Sessions</th><th className="px-4 py-3">Next Session</th><th className="px-4 py-3">Expiry</th><th className="px-4 py-3">Status</th></tr></thead><tbody>{visible.map(([member, trainer, plan, sessions, expiry], index) => <tr key={member} className="border-b border-line last:border-0"><td className="px-4 py-3"><Link href={`/pt-clients/${member.toLowerCase().replaceAll(" ", "-")}`} className="font-medium text-ink hover:text-primary">{member}</Link></td><td className="px-4 py-3 text-ink-muted">{trainer}</td><td className="px-4 py-3 text-ink-muted">{plan}</td><td className="px-4 py-3">{sessions}</td><td className="px-4 py-3 text-ink-muted">{formatDate(calendarDayKey(new Date(now+index*86400000)))} | {index === 0 ? "18:00" : "10:00"}</td><td className="px-4 py-3 text-ink-muted">{expiry}</td><td className="px-4 py-3"><Badge tone="success">active</Badge></td></tr>)}</tbody></DataTable></div></Card>}<p className="mt-4 text-xs text-ink-faint">Demo memakai data contoh lokal. Assignment nyata menggunakan Members dan Plans &amp; Packages.</p></div>;
-}
-
 export default async function PtClientsPage({ searchParams }: { searchParams: Promise<{ view?: string; date?: string; member?: string }> }) {
   const ctx = await getTenantContext(); const params = await searchParams; const view = params.view === "calendar" || params.view === "bookings" ? params.view : "clients";
+  if (ctx.isDemo && !hasDemoPermission(ctx.demoRole, "pt.clients.view")) return <EmptyState title="PT clients are unavailable for this role." />;
   if (ctx.isDemo && params.member && view !== "clients") return <DemoMemberPT id={params.member} view={view} {...memberDemoScope(ctx)} />;
+  if (ctx.isDemo) return <><PageHeader title="PT Clients" description="Demo PT clients and sessions by branch." /><ModuleTabs view={view} /><DemoBranchPT view={view} /></>;
   if (view === "bookings") {
     const empty = { assignments: [], bookings: [], requests: [], trainers: [] };
     const data = ctx.isDemo ? empty : await loadStaffPt().catch(() => ({ ...empty, error: "Could not load PT bookings." }));
@@ -42,7 +38,6 @@ export default async function PtClientsPage({ searchParams }: { searchParams: Pr
       <PtBookingManagement key={`${ctx.organization.id}:${ctx.branch?.id ?? ""}:${ctx.userId}`} initialData={data} demo={ctx.isDemo} />
     </div>;
   }
-  if (ctx.isDemo) return <DemoPtClients view={view} role={ctx.demoRole} now={new Date().getTime()} />;
   const supabase = await createClient();
   const { data: trainerRoles } = await supabase.from("trainer_roles").select("trainer_id").eq("role", "TRAINER");
   const trainerIds = (trainerRoles ?? []).map((row: any) => row.trainer_id);

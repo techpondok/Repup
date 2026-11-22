@@ -10,8 +10,8 @@ import {Input,Select,Textarea,FieldError} from '@/components/ui/field';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
 import {FormModal} from '@/components/ui/form-modal';
 import {useStore} from './store-provider';
-import {useStoreActor} from './store-scope';
-import {STORE_BRANCHES,STORE_CATEGORIES,availableStock,reservedStock,canManageProducts,canViewCost,storeMoney,type StoreProduct} from '@/lib/store/model';
+import {useStoreActor,useStoreBranches} from './store-scope';
+import {STORE_CATEGORIES,availableStock,reservedStock,canManageProducts,canViewCost,storeMoney,type StoreProduct} from '@/lib/store/model';
 
 const imageTypes=['image/jpeg','image/png','image/webp'];
 const MAX_IMAGES=5;
@@ -22,7 +22,7 @@ function StockCount({physical,reserved,available}:{physical:number;reserved:numb
 export function ProductList(){
  const {state,now,dispatch,notify}=useStore();const actor=useStoreActor();
  const [search,setSearch]=useState('');const [category,setCategory]=useState('all');const [status,setStatus]=useState('active');
- const branches=STORE_BRANCHES.filter(branch=>actor.branchIds.includes(branch.id));
+ const branches=useStoreBranches();
  const [selectedBranchId,setBranchId]=useState(branches[0]?.id||'');const branchId=branches.some(branch=>branch.id===selectedBranchId)?selectedBranchId:(branches[0]?.id||'');const [archiving,setArchiving]=useState<StoreProduct|null>(null);const [error,setError]=useState('');
  if(!canManageProducts(actor))return <EmptyState title="Product access restricted" description="An Owner, Admin or Manager role is required."/>;
  const products=state.products.filter(product=>product.organizationId===actor.organizationId&&(status==='all'||product.status===status)&&(category==='all'||product.category===category)&&`${product.name} ${product.sku} ${product.barcode}`.toLowerCase().includes(search.trim().toLowerCase()));
@@ -44,7 +44,7 @@ export function ProductEditor({id}:{id?:string}){
 
 function ProductForm({product}:{product?:StoreProduct}){
  const {state,now,dispatch,notify}=useStore();const actor=useStoreActor();const router=useRouter();const submitted=useRef(false);const productId=useRef(product?.id||'');
- const branches=STORE_BRANCHES.filter(branch=>actor.branchIds.includes(branch.id));
+ const branches=useStoreBranches();
  const [draft,setDraft]=useState<StoreProduct>(()=>product?{...product,images:[...product.images]}:{id:'',organizationId:actor.organizationId,name:'',sku:'',barcode:'',category:STORE_CATEGORIES[0],description:'',images:[],price:0,costPrice:0,stock:Object.fromEntries(branches.map(branch=>[branch.id,0])),minimumStock:5,status:'active',memberSale:true,cashierSale:true,featured:false});
  const [error,setError]=useState('');const [imageError,setImageError]=useState('');const [uploading,setUploading]=useState(false);const [saving,setSaving]=useState(false);const [confirmArchive,setConfirmArchive]=useState(false);
  function update<K extends keyof StoreProduct>(key:K,value:StoreProduct[K]){setDraft(current=>({...current,[key]:value}));setError('');}
@@ -71,7 +71,7 @@ function ProductForm({product}:{product?:StoreProduct}){
 }
 
 export function InventoryManagement(){
- const {state,now,dispatch,notify}=useStore();const actor=useStoreActor();const branches=STORE_BRANCHES.filter(branch=>actor.branchIds.includes(branch.id));
+ const {state,now,dispatch,notify}=useStore();const actor=useStoreActor();const branches=useStoreBranches();
  const [selectedBranchId,setBranchId]=useState(branches[0]?.id||'');const branchId=branches.some(branch=>branch.id===selectedBranchId)?selectedBranchId:(branches[0]?.id||'');const [search,setSearch]=useState('');const [stockFilter,setStockFilter]=useState('all');const [adjusting,setAdjusting]=useState<StoreProduct|null>(null);const [count,setCount]=useState('');const [reason,setReason]=useState('');const [error,setError]=useState('');
  if(!canManageProducts(actor))return <EmptyState title="Inventory access restricted" description="An Owner, Admin or Manager role is required."/>;
  const products=state.products.filter(product=>product.organizationId===actor.organizationId&&`${product.name} ${product.sku}`.toLowerCase().includes(search.trim().toLowerCase())&&(stockFilter==='all'||(stockFilter==='low'?availableStock(state,product.id,branchId,now)<=product.minimumStock:availableStock(state,product.id,branchId,now)===0)));

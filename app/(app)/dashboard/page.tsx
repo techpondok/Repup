@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BranchPerformance } from "@/components/branches/performance";
 import { getTenantContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, StatCard, AnalyticsCard } from "@/components/ui/layout-bits";
@@ -20,7 +21,7 @@ function greeting() {
 
 export default async function DashboardPage() {
   const ctx = await getTenantContext();
-  if (ctx.isDemo) return <DemoDashboard ctx={ctx} />;
+  if (ctx.isDemo) return ctx.demoRole === "COACH" || ctx.demoRole === "TRAINER" ? <DemoDashboard ctx={ctx} /> : <BranchPerformance />;
   const supabase = await createClient();
   const gym = ctx.gyms.find((g) => g.id === ctx.branch?.gym_id);
   const currency = gym?.currency ?? "IDR";

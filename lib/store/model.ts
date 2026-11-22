@@ -2,7 +2,7 @@ export const STORE_ORG_ID='demo-org-powerhouse';
 export const STORE_BRANCHES=[{id:'demo-location-kediri',name:'Kediri'},{id:'demo-location-surabaya',name:'Surabaya'},{id:'demo-location-malang',name:'Malang'}];
 export const STORE_CATEGORIES=['Beverages','Supplements','Gym Accessories','Merchandise','Snacks','Other'];
 export const RESERVATION_MS=15*60*1000;
-export interface StoreActor {role:string;organizationId:string;branchIds:string[];memberId?:string;name:string}
+export interface StoreActor {role:string;organizationId:string;branchIds:string[];managedBranches?:string[];memberId?:string;name:string}
 export interface StoreProduct {id:string;organizationId:string;name:string;sku:string;barcode:string;category:string;description:string;images:string[];price:number;costPrice:number;stock:Record<string,number>;minimumStock:number;status:'active'|'archived';memberSale:boolean;cashierSale:boolean;featured:boolean}
 export interface CartLine {productId:string;quantity:number}
 export type PaymentStatus='unpaid'|'pending'|'paid'|'failed'|'refunded';
@@ -46,7 +46,7 @@ export function expireStoreOrders(state:StoreState,now:number):StoreState{
 export function storeTransition(input:StoreState,action:StoreAction):StoreResult{
  const now=action.now??Date.now();const state=expireStoreOrders(input,now);const actor=action.actor;
  const fail=(error:string):StoreResult=>({state,error});
- const validBranch=(id:string)=>STORE_BRANCHES.some(b=>b.id===id)&&actor.branchIds.includes(id);
+ const validBranch=(id:string)=>(actor.managedBranches?.includes(id)||STORE_BRANCHES.some(b=>b.id===id))&&actor.branchIds.includes(id);
  const integer=(value:number,max=1000000)=>Number.isSafeInteger(value)&&value>=0&&value<=max;
  const owned=(id:string)=>state.products.find(p=>p.id===id&&p.organizationId===actor.organizationId);
  if(action.type==='tick')return {state};

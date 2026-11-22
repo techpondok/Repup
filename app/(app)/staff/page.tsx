@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui/layout-bits";
 import { Badge } from "@/components/ui/badge";
 import { InviteStaffForm } from "@/components/staff/invite-staff-form";
+import { DemoStaffWorkspace } from "@/components/staff/demo-workspace";
+import { hasDemoPermission } from "@/lib/demo/roles";
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Owner",
@@ -14,15 +16,20 @@ const ROLE_LABEL: Record<string, string> = {
   staff: "Staff",
 };
 
-export default async function StaffPage() {
+export default async function StaffPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const ctx = await getTenantContext();
-  const supabase = await createClient();
+  if (ctx.isDemo) {
+    if (!hasDemoPermission(ctx.demoRole, "staff.view")) {
+      return <><PageHeader title="Staff" /><EmptyState title="Akses daftar staff tidak tersedia untuk role ini" /></>;
+    }
+    return <DemoStaffWorkspace branches={ctx.branches} canCreate={ctx.isOrgWide} branchId={(await searchParams).branch} />;
+  }
 
-  const { data: staff } = await supabase
-    .from("organization_users")
-    .select("*, profiles(full_name)")
-    .eq("organization_id", ctx.organization.id)
-    .order("created_at");
+  const { data: staff } = await (await createClient())
+        .from("organization_users")
+        .select("*, profiles(full_name)")
+        .eq("organization_id", ctx.organization.id)
+        .order("created_at");
 
   return (
     <div>

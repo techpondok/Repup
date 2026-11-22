@@ -16,6 +16,7 @@ export type Availability = {
 };
 
 export interface ManagedTrainer {
+  branchIds?: string[];
   id: string;
   name: string;
   code: string;
@@ -39,6 +40,8 @@ export interface ManagedTrainer {
 export interface TrainerSession {
   id: string;
   assignmentId?: string;
+  branchId?: string;
+  assignedTrainerId?: string;
   memberName: string;
   date: string;
   start: string;

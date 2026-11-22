@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useStore } from "@/components/store/store-provider";
-import { useStoreActor } from "@/components/store/store-scope";
+import { useStoreActor, useStoreBranches } from "@/components/store/store-scope";
 import { useMemberDemo } from "@/components/members/demo-provider";
 import { STORE_BRANCHES, STORE_CATEGORIES, availableStock, canDiscount, storeMoney, visibleOrders, visibleProducts, type StoreOrder, type PaymentMethod } from "@/lib/store/model";
 
@@ -39,7 +39,7 @@ export function CashierStore({ initialMemberId }: { initialMemberId?: string }) 
   const { state, now, dispatch, cashierCart, setCashierCart, notify } = useStore();
   const router = useRouter();
   const { members } = useMemberDemo();
-  const branches = STORE_BRANCHES.filter(branch => actor.branchIds.includes(branch.id));
+  const branches = useStoreBranches();
   const [branchId, setBranchId] = useState(() => branches.find(branch => members.some(member => member.id === initialMemberId && member.branchId === branch.id))?.id ?? branches[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
@@ -105,10 +105,11 @@ export function CashierStore({ initialMemberId }: { initialMemberId?: string }) 
 }
 
 export function CashierOrders() {
+  const branches = useStoreBranches();
   const actor = useStoreActor(); const { state } = useStore();
   const [search, setSearch] = useState(""); const [branch, setBranch] = useState("all"); const [payment, setPayment] = useState("all"); const [fulfillment, setFulfillment] = useState("all"); const [limit, setLimit] = useState(20);
   const orders = visibleOrders(state, actor).filter(order => (branch === "all" || order.branchId === branch) && (payment === "all" || order.paymentStatus === payment) && (fulfillment === "all" || order.fulfillmentStatus === fulfillment) && `${order.id} ${order.customerName} ${order.lines.map(line => line.name).join(" ")}`.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => b.createdAt - a.createdAt);
-  return <div><PageHeader title="Store transactions" description="Cashier sales and member orders within your permitted branches."/><StoreTabs active="orders"/><Card className="mb-5 grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4"><label className="text-sm text-ink">Order or customer<Input className="mt-2" type="search" value={search} onChange={event => { setSearch(event.target.value); setLimit(20); }} placeholder="Order ID, name, product"/></label><label className="text-sm text-ink">Branch<Select className="mt-2" value={branch} onChange={event => setBranch(event.target.value)}><option value="all">All permitted branches</option>{STORE_BRANCHES.filter(item => actor.branchIds.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label><label className="text-sm text-ink">Payment<Select className="mt-2 capitalize" value={payment} onChange={event => setPayment(event.target.value)}><option value="all">All payment statuses</option>{paymentStatuses.map(value => <option key={value}>{value}</option>)}</Select></label><label className="text-sm text-ink">Fulfillment<Select className="mt-2 capitalize" value={fulfillment} onChange={event => setFulfillment(event.target.value)}><option value="all">All fulfillment statuses</option>{fulfillmentStatuses.map(value => <option key={value} value={value}>{readable(value)}</option>)}</Select></label></Card>
+  return <div><PageHeader title="Store transactions" description="Cashier sales and member orders within your permitted branches."/><StoreTabs active="orders"/><Card className="mb-5 grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4"><label className="text-sm text-ink">Order or customer<Input className="mt-2" type="search" value={search} onChange={event => { setSearch(event.target.value); setLimit(20); }} placeholder="Order ID, name, product"/></label><label className="text-sm text-ink">Branch<Select className="mt-2" value={branch} onChange={event => setBranch(event.target.value)}><option value="all">All permitted branches</option>{branches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label><label className="text-sm text-ink">Payment<Select className="mt-2 capitalize" value={payment} onChange={event => setPayment(event.target.value)}><option value="all">All payment statuses</option>{paymentStatuses.map(value => <option key={value}>{value}</option>)}</Select></label><label className="text-sm text-ink">Fulfillment<Select className="mt-2 capitalize" value={fulfillment} onChange={event => setFulfillment(event.target.value)}><option value="all">All fulfillment statuses</option>{fulfillmentStatuses.map(value => <option key={value} value={value}>{readable(value)}</option>)}</Select></label></Card>
     {orders.length ? <div className="space-y-3">{orders.slice(0, limit).map(order => <Card key={order.id} className="p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0"><Link href={`/pos/orders/${order.id}`} className="break-all text-sm font-semibold text-ink hover:text-primary">{order.id}</Link><p className="mt-1 text-sm text-ink-muted">{order.customerName} | {branchName(order.branchId)}</p><p className="mt-2 text-xs text-ink-muted">{orderDate(order.createdAt)} WIB | {order.source === "member" ? "Member order" : "Cashier sale"}</p></div><div className="space-y-2"><p className="text-sm font-semibold text-ink">{storeMoney(order.total)}</p><OrderStatuses order={order}/></div></div><Link href={`/pos/orders/${order.id}`} className="mt-3 inline-flex min-h-10 items-center text-sm font-medium text-primary">View receipt &amp; process order</Link></Card>)}{orders.length > limit && <Button variant="secondary" onClick={() => setLimit(value => value + 20)}>Load more transactions</Button>}</div> : <EmptyState title="No transactions found" description="Complete a cashier sale, or adjust the filters to see member orders." action={<LinkButton href="/pos">Open point of sale</LinkButton>}/>}</div>;
 }
 
@@ -135,7 +136,7 @@ export function CashierOrderDetail({ id }: { id: string }) {
 
 export function CashierPickup({ initialOrderId = "" }: { initialOrderId?: string }) {
   const actor = useStoreActor(); const { state, dispatch, notify } = useStore();
-  const branches = STORE_BRANCHES.filter(branch => actor.branchIds.includes(branch.id));
+  const branches = useStoreBranches();
   const allOrders = visibleOrders(state, actor);
   const initialOrder = allOrders.find(order => order.id === initialOrderId);
   const [branchId, setBranchId] = useState(initialOrder?.branchId || branches[0]?.id || "");

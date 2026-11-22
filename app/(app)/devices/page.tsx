@@ -18,6 +18,17 @@ function DeviceIcon({ type }: { type: string }) {
 
 export default async function DevicesPage() {
   const ctx = await getTenantContext();
+  if (ctx.isDemo) {
+    return (
+      <div>
+        <PageHeader title="Devices" description="Pantau kamera, scanner, RFID, NFC, dan connector per cabang." />
+        <Card>
+          <EmptyState title="Data tersedia di akun gym" />
+        </Card>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const { data: devices } = await (supabase as any).from("gym_devices").select("*, branches(name)").eq("organization_id", ctx.organization.id).order("created_at", { ascending: false });
   const visibleDevices = ctx.branch ? (devices ?? []).filter((device: any) => device.branch_id === ctx.branch?.id) : devices ?? [];

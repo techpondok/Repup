@@ -51,6 +51,7 @@ export const NAV = [
     section: "Keuangan",
     items: [
       { href: "/transactions", label: "Transaksi", icon: Receipt, permission: "transactions.view" },
+      { href: "/dashboard/payroll", label: "Payroll", icon: Receipt, permission: "payroll.view" },
       { href: "/reports", label: "Laporan", icon: BarChart3, permission: "reports.view" },
     ],
   },
@@ -85,7 +86,7 @@ export function Sidebar({ ctx }: { ctx: TenantContext }) {
             )}
             <ul className="space-y-0.5">
               {group.items.filter((item) => !ctx.isDemo || hasDemoPermission(ctx.demoRole, item.permission)).map((item) => {
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>

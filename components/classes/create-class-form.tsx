@@ -1,5 +1,7 @@
 "use client";
 
+import { useBranchDemo } from "@/components/branches/demo-provider";
+
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -41,7 +43,14 @@ function Toggle({ checked, label, change }: { checked: boolean; label: string; c
 const grid = "grid gap-4 sm:grid-cols-2";
 const durations = [30, 45, 60, 90];
 
-export function CreateClassForm({ branches, defaultBranch }: { branches: ClassBranch[]; defaultBranch: string }) {
+export function CreateClassForm(props: { branches: ClassBranch[]; defaultBranch: string }) {
+  const demo = useBranchDemo();
+  const branches = demo ? demo.active.filter(branch => demo.scopedIds.includes(branch.id)) : props.branches;
+  const defaultBranch = demo ? demo.scope?.id ?? branches[0]?.id ?? "" : props.defaultBranch;
+  return <ClassDraftForm key={defaultBranch} branches={branches} defaultBranch={defaultBranch} />;
+}
+
+function ClassDraftForm({ branches, defaultBranch }: { branches: ClassBranch[]; defaultBranch: string }) {
   const router = useRouter();
   const { state, dispatch } = useClasses();
   const { details: trainers } = useTrainerDemo();

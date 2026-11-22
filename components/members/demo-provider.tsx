@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { activeCount, day, plans, seedMembers, type Member } from "@/lib/demo/member-management";
+import { useBranchDemo } from "@/components/branches/demo-provider";
 
 type Plan = keyof typeof plans;
 type Result = "saved" | "limit";
@@ -19,7 +20,9 @@ const Context = createContext<Demo | null>(null);
 export function MemberDemoProvider({ children, initialDay }: { children: ReactNode; initialDay: string }) {
   const [today, setToday] = useState(initialDay);
   const [members, setMembers] = useState(() => seedMembers(initialDay));
-  const [plan, setPlan] = useState<Plan>("Free");
+  const [standalonePlan, setStandalonePlan] = useState<Plan>("Free");
+  const billing = useBranchDemo();
+  const plan = billing ? billing.plan === "Starter" ? "Growth" : "Free" : standalonePlan;
   const latest = useRef(members);
   useEffect(() => {
     const refreshDay = () => setToday(day());
@@ -55,9 +58,12 @@ export function MemberDemoProvider({ children, initialDay }: { children: ReactNo
     replace([...latest.current, ...added]);
   }
 
-  return <Context.Provider value={{ today, members, plan, update, setPlan, fillLimit, reset: () => {
+  return <Context.Provider value={{ today, members, plan, update, setPlan: next => {
+    if (billing) billing.changePlan(next === "Growth" ? "Starter" : "Free");
+    else setStandalonePlan(next);
+  }, fillLimit, reset: () => {
     replace(seedMembers(day()));
-    setPlan("Free");
+    setStandalonePlan("Free");
   } }}>{children}</Context.Provider>;
 }
 

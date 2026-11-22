@@ -1,8 +1,11 @@
 import { getTenantContext } from "@/lib/tenant";
+import { BranchPerformance } from "@/components/branches/performance";
+import { hasDemoPermission } from "@/lib/demo/roles";
+import { EmptyState } from "@/components/ui/layout-bits";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, SectionLabel, Stat } from "@/components/ui/layout-bits";
 import { RevenueChart, GrowthChart } from "@/components/reports/charts";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 
 function dayKey(d: Date) {
   return d.toISOString().slice(5, 10);
@@ -10,6 +13,7 @@ function dayKey(d: Date) {
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const ctx = await getTenantContext();
+  if (ctx.isDemo) return hasDemoPermission(ctx.demoRole, "reports.view") ? <BranchPerformance report /> : <EmptyState title="Reports are unavailable for this role." />;
   const sp = await searchParams;
   const supabase = await createClient();
 

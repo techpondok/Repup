@@ -16,6 +16,7 @@ import { activity, current, daysLeft, packageFor, status, type Activity, type Me
 import { Field, FollowUpForm, Footer, MemberForm, RenewalForm } from "./demo-forms";
 import { PlanDialog } from "./demo-plan";
 import { useMemberDemo } from "./demo-provider";
+import { useBranchDemo } from "@/components/branches/demo-provider";
 import type { DemoScope } from "./demo-scope";
 import { Avatar, dateLabel, dateTimeLabel, Facts, MemberTable, Status, timeLabel } from "./demo-ui";
 import { Textarea } from "@/components/ui/field";
@@ -29,7 +30,9 @@ const dateKey = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Jakarta" });
 const section = "mb-4 text-base font-semibold";
 type Dialog = "edit" | "renew" | "change" | "freeze" | "unfreeze" | "limit" | "follow" | "trainer" | null;
 
-export function DemoMemberDetail({ id, requestedTab, ...scope }: DemoScope & { id: string; requestedTab?: string }) {
+export function DemoMemberDetail({ id, requestedTab, ...initialScope }: DemoScope & { id: string; requestedTab?: string }) {
+  const branch = useBranchDemo();
+  const scope = branch ? { ...initialScope, branchIds: branch.scopedIds, branchId: branch.scope?.id ?? branch.scopedIds[0] ?? "" } : initialScope;
   const demo = useMemberDemo();
   const { state: store } = useStore();
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -70,11 +73,14 @@ export function DemoMemberDetail({ id, requestedTab, ...scope }: DemoScope & { i
     mutate(item => {
       if (item.visits[0] && !item.visits[0].out) { feedback = "Check out the current visit first."; return item; }
       if (!["Active", "Expiring Soon"].includes(status(item, demo.today))) { feedback = "An active membership is required for check-in."; return item; }
+      const branchId = branch?.scope?.id ?? item.branchId;
+      if (!scope.branchIds.includes(branchId) || !(item.allowedBranchIds ?? [item.branchId]).includes(branchId)) { feedback = "Membership is unavailable at this branch."; return item; }
       const at = new Date().toISOString();
-      return activity({ ...item, visits: [{ id: crypto.randomUUID(), at }, ...item.visits] }, "Check-in", "Simulated member QR check-in", at);
+      return activity({ ...item, lastVisitedBranchId: branchId, visits: [{ id: crypto.randomUUID(), at, branchId }, ...item.visits] }, "Check-in", "Simulated member QR check-in", at);
     });
     setMessage(feedback || "Check-in recorded.");
   }
+  const branchLabel = (id?: string) => branch?.allowed.find(item => item.id === id)?.name ?? id ?? "—";
   function checkOut() {
     mutate(item => !item.visits[0] || item.visits[0].out ? item : {
       ...item, visits: [{ ...item.visits[0], out: new Date().toISOString() }, ...item.visits.slice(1)],
@@ -140,6 +146,8 @@ export function DemoMemberDetail({ id, requestedTab, ...scope }: DemoScope & { i
         ["Current Membership", packageName], ["Expiration Date", dateLabel(membership?.end)],
         ["Remaining Days", membership ? Math.max(0, daysLeft(membership.end, demo.today)) : "—"],
         ["Visits This Month", monthlyVisits], ["Last Check-in", dateTimeLabel(latestVisit?.at)],
+        ["Home Branch", branchLabel(member.branchId)], ["Allowed Branches", (member.allowedBranchIds ?? [member.branchId]).map(branchLabel).join(", ")],
+        ["Last Visited Branch", branchLabel(member.lastVisitedBranchId ?? (latestVisit ? latestVisit.branchId ?? member.branchId : undefined))],
         ["Assigned Personal Trainer", trainer ? trainer.name : "—"], ["Remaining PT Sessions", hasPT ? available : "—"],
         ["Email", member.email || "—"], ["Date of Birth", dateLabel(member.birth)], ["Gender", member.gender || "—"],
         ["Address", member.address || "—"], ["Emergency Contact", member.emergency || "—"],
@@ -174,8 +182,8 @@ export function DemoMemberDetail({ id, requestedTab, ...scope }: DemoScope & { i
           {checkInButton("Simulate Check-in")}
         </div>
       </Card>
-      <Card><h2 className="px-5 pt-4 font-semibold">Attendance History</h2><MemberTable headers={["Date", "Check-in Time", "Check-out Time", "Method", "Status"]}
-        rows={member.visits.map(item => ({ id: item.id, cells: [dateLabel(item.at), timeLabel(item.at), timeLabel(item.out), item.id.startsWith("visit-") ? "Front Desk" : "Demo QR", item.out ? "Completed" : "Checked In"] }))} empty="No check-ins yet" /></Card>
+      <Card><h2 className="px-5 pt-4 font-semibold">Attendance History</h2><MemberTable headers={["Date", "Branch", "Check-in Time", "Check-out Time", "Method", "Status"]}
+        rows={member.visits.map(item => ({ id: item.id, cells: [dateLabel(item.at), branchLabel(item.branchId ?? member.branchId), timeLabel(item.at), timeLabel(item.out), item.id.startsWith("visit-") ? "Front Desk" : "Demo QR", item.out ? "Completed" : "Checked In"] }))} empty="No check-ins yet" /></Card>
     </>}
     {tab === "purchases" && <DemoPurchaseHistory memberId={id} branchIds={scope.branchIds} />}
     {tab === "personal-training" && (trainer && ptPlan ? <>

@@ -18,7 +18,7 @@ const PRIMARY = [
 ];
 
 function activePath(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
 }
 
 export function MobileNav({ ctx }: { ctx: TenantContext }) {
