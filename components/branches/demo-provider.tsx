@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { branchCost, branchError, demoBranches, type Branch, type Plan } from "@/lib/demo/branches";
+import { branchCost, branchError, demoBranches, trainerBranchIds, type Branch, type Plan } from "@/lib/demo/branches";
+import { useTrainerDemo } from "@/components/trainers/trainer-demo-provider";
 
 const Context = createContext<ReturnType<typeof useBranchState> | null>(null);
 
@@ -43,7 +44,10 @@ function useBranchState(role: string, assigned: string[]) {
 }
 
 export function BranchDemoProvider({ role, assigned, children }: { role: string; assigned: string[]; children: ReactNode }) {
-  return <Context.Provider value={useBranchState(role, assigned)}>{children}</Context.Provider>;
+  const { details } = useTrainerDemo();
+  const trainer = role === "TRAINER" ? details.find(item => item.trainer.id === "demo-trainer-2")?.trainer : undefined;
+  const scope = useBranchState(role, trainer ? trainerBranchIds(trainer.id, trainer.branchIds) : assigned);
+  return <Context.Provider value={scope}>{children}</Context.Provider>;
 }
 
 export function useBranchDemo() {

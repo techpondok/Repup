@@ -46,7 +46,8 @@ export function TrainerWorkspace({ trainers, canManage, canEditSessions, actorNa
   const { details: sharedDetails, setDetails: setLocalDetails } = useTrainerDemo();
   const branchScope = useBranchDemo();
   const scopedDetails = branchScope ? sharedDetails.filter(({ trainer }) => trainerBranchIds(trainer.id, trainer.branchIds).some(id => branchScope.scopedIds.includes(id))) : sharedDetails;
-  const localDetails = !demo || error ? [] : !canManage && canEditSessions ? scopedDetails.slice(0, 1) : scopedDetails;
+  const localDetails = !demo || error ? [] : branchScope?.role === "TRAINER" ? scopedDetails.filter(item => item.trainer.id === "demo-trainer-2")
+    : !canManage && canEditSessions ? scopedDetails.slice(0, 1) : scopedDetails;
   const [loadError, setLoadError] = useState(error ?? "");
   const [permissions, setPermissions] = useState({ canManage, canEditSessions });
   const [refreshing, setRefreshing] = useState(false);
