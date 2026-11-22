@@ -4,6 +4,7 @@ import { CheckinTerminal } from "@/components/checkin/checkin-terminal";
 import { getActiveVisits, getRecentAttendance } from "@/app/actions/checkin";
 import { DemoCheckinTerminal } from "@/components/checkin/demo-checkin-terminal";
 import { hasDemoPermission } from "@/lib/demo/roles";
+import { requirePermission } from "@/lib/authorization";
 
 export default async function CheckInPage() {
   const ctx = await getTenantContext();
@@ -16,6 +17,7 @@ export default async function CheckInPage() {
   if (ctx.isDemo && !hasDemoPermission(ctx.demoRole, "checkin.use") && !hasDemoPermission(ctx.demoRole, "checkin.manage")) {
     return <EmptyState title="Akses Check-in tidak tersedia untuk peran ini" />;
   }
+  if (!ctx.isDemo) await requirePermission("checkin.manage");
 
   const [recent, active] = ctx.isDemo ? [] : await Promise.allSettled([
     getRecentAttendance(ctx.branch.id), getActiveVisits(ctx.branch.id),

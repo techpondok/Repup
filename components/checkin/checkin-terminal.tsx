@@ -7,16 +7,21 @@ import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/layout-bits";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { checkInIdentifier, searchMembersForCheckIn, type CheckInResult } from "@/app/actions/checkin";
 
 type MemberHit = { id: string; full_name: string; member_code: string; phone: string | null };
 type AttendanceDirection = "IN" | "OUT" | "AUTO";
+type AttendanceMember = { full_name?: string | null; member_code?: string | null };
+const historyTime = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" });
 type AttendanceRow = {
   id: string; member_id?: string; occurred_at?: string | null; check_out_at?: string | null;
   attendance_status?: string | null; status?: string | null; source?: string | null; method?: string | null;
-  members?: { full_name?: string | null; member_code?: string | null } | null;
+  members?: AttendanceMember | AttendanceMember[] | null;
 };
+function memberInfo(item: AttendanceRow) {
+  return Array.isArray(item.members) ? item.members[0] : item.members;
+}
 type DemoAdapter = {
   recent: AttendanceRow[]; active: AttendanceRow[];
   search: (query: string) => Promise<MemberHit[]>;
@@ -57,6 +62,8 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
   const cameraStarting = useRef(false);
   const [mode, setMode] = useState<"auto" | "camera" | "manual">("auto");
   const [direction, setDirection] = useState<AttendanceDirection>("AUTO");
+  const directionRef = useRef<AttendanceDirection>("AUTO");
+  const submitting = useRef(false);
   const [identifier, setIdentifier] = useState("");
   const [results, setResults] = useState<MemberHit[]>([]);
   const [result, setResult] = useState<CheckInResult | null>(null);
@@ -91,6 +98,7 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
   }
 
   useEffect(() => () => stopCamera(), []);
+  useEffect(() => { directionRef.current = direction; }, [direction]);
 
   async function startCamera() {
     if (cameraStarting.current || streamRef.current) return;
@@ -107,7 +115,6 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
       if (attempt !== cameraRequest.current) { stream.getTracks().forEach(track => track.stop()); return; }
       streamRef.current = stream;
-      setCameraOpen(true);
       await new Promise((resolve) => requestAnimationFrame(resolve));
       if (attempt !== cameraRequest.current) return;
       if (!videoRef.current) throw new Error("Video unavailable");
@@ -130,6 +137,7 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
       }
       if (attempt !== cameraRequest.current) return;
       cameraStarting.current = false;
+      setCameraOpen(true);
       const scanner = detector;
       scanningRef.current = true;
       const scan = async () => {
@@ -139,7 +147,7 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
           if (attempt !== cameraRequest.current) return;
           if (found[0]?.rawValue) {
             stopCamera();
-            submitIdentifier(found[0].rawValue, "camera_qr");
+            submitIdentifier(found[0].rawValue, "camera_qr", directionRef.current);
             return;
           }
         } catch { /* Camera frames may fail while autofocus adjusts. */ }
@@ -156,7 +164,8 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
 
   function submitIdentifier(value: string, source: "manual" | "usb_qr" | "camera_qr", requestedDirection = direction) {
     const clean = value.trim();
-    if (!clean || pending) return;
+    if (!clean || submitting.current) return;
+    submitting.current = true;
     setIdentifier("");
     searchSequence.current++;
     setSearching(false);
@@ -172,6 +181,8 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
         setFeedback("Check-in tidak dapat diproses. Coba lagi.");
         setIdentifier(clean);
         return;
+      } finally {
+        submitting.current = false;
       }
       stopCamera();
       setResult(response);
@@ -213,7 +224,7 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
     const success = result.result_status === "success";
     const checkedOut = result.action === "check_out";
     const alreadyInside = result.action === "already_inside";
-    return <div className="space-y-5"><Card className={`mx-auto max-w-xl border-2 p-6 text-center sm:p-10 ${success ? "border-success/30" : "border-danger/30"}`}><div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full ${success ? "bg-success-tint text-success" : "bg-danger-tint text-danger"}`}>{success ? <CheckCircle2 size={32} /> : <XCircle size={32} />}</div><h2 className="text-xl font-semibold text-ink">{!success ? "ACCESS DENIED" : checkedOut ? "CHECK-OUT BERHASIL" : alreadyInside ? "MEMBER SUDAH DI DALAM" : "CHECK-IN BERHASIL"}</h2><p className="mt-2 text-sm text-ink-muted">{success ? `${result.member_name ?? "Member"}${checkedOut ? " telah keluar dari gym." : ""}` : result.denial_reason}</p>{success && <div className="mx-auto mt-5 max-w-sm rounded-md bg-canvas p-4 text-left text-sm"><div className="flex justify-between gap-3"><span className="text-ink-faint">Membership</span><span className="font-medium text-ink">{result.plan_name ?? "-"}</span></div><div className="mt-2 flex justify-between gap-3"><span className="text-ink-faint">Status kunjungan</span><span className="font-medium text-ink">{checkedOut ? "Selesai" : alreadyInside ? "Masih di gym" : "Sedang di gym"}</span></div>{result.durationSeconds != null && <div className="mt-2 flex justify-between gap-3"><span className="text-ink-faint">Durasi</span><span className="text-ink">{Math.floor(result.durationSeconds / 60)} menit</span></div>}{result.valid_until && <div className="mt-2 flex justify-between gap-3"><span className="text-ink-faint">Berlaku hingga</span><span className="text-ink">{formatDate(result.valid_until)}</span></div>}</div>}{!success && result.denial_reason?.toLowerCase().includes("kadaluarsa") ? <LinkButton href="/pos" className="mt-4 inline-flex">Perpanjang Membership</LinkButton> : null}<Button variant="secondary" className="mt-6 w-full" onClick={resetResult}>Scan Berikutnya</Button></Card></div>;
+    return <div className="space-y-5"><Card className={`mx-auto max-w-xl border-2 p-6 text-center sm:p-10 ${success ? "border-success/30" : "border-danger/30"}`}><div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full ${success ? "bg-success-tint text-success" : "bg-danger-tint text-danger"}`}>{success ? <CheckCircle2 size={32} /> : <XCircle size={32} />}</div><h2 className="text-xl font-semibold text-ink">{!success ? "ACCESS DENIED" : checkedOut ? "CHECK-OUT BERHASIL" : alreadyInside ? "MEMBER SUDAH DI DALAM" : "CHECK-IN BERHASIL"}</h2><p className="mt-2 text-sm text-ink-muted">{success ? `${result.member_name ?? "Member"}${checkedOut ? " telah keluar dari gym." : ""}` : result.denial_reason}</p>{success && <div className="mx-auto mt-5 max-w-sm rounded-md bg-canvas p-4 text-left text-sm"><div className="flex justify-between gap-3"><span className="text-ink-faint">Membership</span><span className="font-medium text-ink">{result.plan_name ?? "-"}</span></div><div className="mt-2 flex justify-between gap-3"><span className="text-ink-faint">Status kunjungan</span><span className="font-medium text-ink">{checkedOut ? "Selesai" : alreadyInside ? "Masih di gym" : "Sedang di gym"}</span></div>{result.durationSeconds != null && <div className="mt-2 flex justify-between gap-3"><span className="text-ink-faint">Durasi</span><span className="text-ink">{Math.floor(result.durationSeconds / 60)} menit</span></div>}{result.valid_until && Number.isFinite(Date.parse(result.valid_until)) && <div className="mt-2 flex justify-between gap-3"><span className="text-ink-faint">Berlaku hingga</span><span className="text-ink">{formatDate(result.valid_until)}</span></div>}</div>}{!success && result.denial_reason?.toLowerCase().includes("kadaluarsa") ? <LinkButton href="/pos" className="mt-4 inline-flex">Perpanjang Membership</LinkButton> : null}<Button variant="secondary" className="mt-6 w-full" onClick={resetResult}>Scan Berikutnya</Button></Card></div>;
   }
 
   return <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(22rem,0.9fr)]">
@@ -222,7 +233,7 @@ export function CheckinTerminal({ organizationId, branchId, branchName, initialR
         <div className="relative"><ScanLine size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary" /><Input ref={inputRef} autoFocus value={identifier} onChange={(event) => mode === "manual" ? runSearch(event.target.value) : setIdentifier(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitIdentifier(identifier, mode === "camera" ? "camera_qr" : mode === "auto" ? "usb_qr" : "manual"); } }} disabled={pending} placeholder="Member ID / QR / RFID UID" className="h-12 pl-10 pr-4 text-base" /></div><p className="mt-2 flex items-center gap-2 text-xs text-ink-faint">{mode === "manual" ? <Search size={14} /> : <Keyboard size={14} />} {mode === "manual" ? "Cari nama, nomor telepon, atau Member ID." : `Scanner siap. Mode ${direction === "AUTO" ? "otomatis" : direction === "IN" ? "masuk" : "keluar"}. Tekan Enter setelah scan.`}</p>{cameraError && mode === "camera" && <p role="alert" className="mt-3 rounded-md bg-danger-tint px-3 py-2 text-xs text-danger">{cameraError}</p>}{feedback && <p role="alert" className="mt-3 text-sm text-danger">{feedback}</p>}{mode === "manual" && searching && <p role="status" className="mt-3 text-sm text-ink-muted">Mencari member…</p>}{mode === "manual" && searched && !results.length && <p className="mt-3 text-sm text-ink-muted">Member tidak ditemukan.</p>}{mode === "manual" && results.length > 0 && <div className="mt-2 divide-y divide-line rounded-md border border-line bg-surface">{results.map((member) => <button key={member.id} type="button" onClick={() => submitIdentifier(member.id, "manual")} disabled={pending} className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm hover:bg-canvas"><span className="font-medium text-ink">{member.full_name}</span><span className="num text-xs text-ink-faint">{member.member_code}</span></button>)}</div>}{pending && <p role="status" className="mt-3 text-center text-sm text-ink-faint">Memproses attendance...</p>}
         <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="flex items-center gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-xs text-ink-muted"><Camera size={15} className="text-primary" />Camera <span className="ml-auto text-success">Ready</span></div><div className="flex items-center gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-xs text-ink-muted"><Keyboard size={15} className="text-primary" />USB / HID <span className="ml-auto text-success">Listening</span></div><div className="flex items-center gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-xs text-ink-muted"><Radio size={15} className="text-primary" />RFID / Gate <span className="ml-auto text-ink-faint">Connector</span></div></div>
       </div></Card>
-    <div className="space-y-5"><Card className="overflow-hidden"><div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-5"><div><h2 className="text-base font-semibold text-ink">Active Visitors <span className="text-primary">{active.length}</span></h2><p className="mt-1 text-xs text-ink-muted">Member yang masih berada di gym</p></div><Clock3 size={18} className="text-primary" /></div><div className="divide-y divide-line">{activeUnavailable && <p role="alert" className="p-3 text-sm text-danger">Kunjungan aktif gagal dimuat. <button type="button" className="underline" onClick={() => router.refresh()}>Coba lagi</button></p>}{active.length === 0 && activeUnavailable ? null : active.length === 0 ? <div className="p-6 text-center text-sm text-ink-muted">Belum ada member di dalam gym.</div> : active.map((item) => <div key={item.id} className="flex items-center gap-3 px-4 py-3 sm:px-5"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-tint text-success"><LogIn size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{item.members?.full_name ?? "Member"}</p><p className="text-xs text-ink-faint">{item.members?.member_code ?? "-"} · {durationSince(item.occurred_at)}</p></div><button type="button" disabled={pending || !item.member_id} onClick={() => { if (item.member_id && window.confirm("Check-out member ini?")) submitIdentifier(item.member_id, "manual", "OUT"); }} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-line px-2.5 text-xs font-medium text-ink-muted hover:border-primary hover:text-primary"><LogOut size={14} />Keluar</button></div>)}</div></Card>
-      <Card className="overflow-hidden"><div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-5"><div><h2 className="text-base font-semibold text-ink">Recent Attendance</h2><p className="mt-1 text-xs text-ink-muted">Aktivitas terbaru di {branchName}</p></div><ShieldCheck size={18} className="text-primary" /></div><div className="divide-y divide-line">{historyUnavailable && <p role="alert" className="p-3 text-sm text-danger">Riwayat gagal dimuat. <button type="button" className="underline" onClick={() => router.refresh()}>Coba lagi</button></p>}{recent.length === 0 && historyUnavailable ? null : recent.length === 0 ? <div className="p-8 text-center text-sm text-ink-muted">Belum ada attendance.</div> : recent.map((item) => <div key={item.id} className="flex items-center gap-3 px-4 py-3 sm:px-5"><div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.status === "success" ? "bg-success-tint text-success" : "bg-danger-tint text-danger"}`}>{item.attendance_status === "active" ? <LogIn size={17} /> : item.check_out_at ? <LogOut size={17} /> : item.status === "success" ? <CheckCircle2 size={17} /> : <CircleOff size={17} />}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{item.members?.full_name ?? "Member"}</p><p className="truncate text-xs text-ink-faint">{item.members?.member_code ?? "-"} · {item.attendance_status ?? item.status}</p></div><div className="text-right"><p className="text-xs font-medium text-ink">{item.occurred_at && Number.isFinite(Date.parse(item.occurred_at)) ? formatDateTime(item.occurred_at) : "-"}</p><p className="mt-0.5 text-[11px] capitalize text-ink-faint">{item.source ?? item.method ?? "manual"}</p></div></div>)}</div></Card></div>
+    <div className="space-y-5"><Card className="overflow-hidden"><div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-5"><div><h2 className="text-base font-semibold text-ink">Active Visitors <span className="text-primary">{active.length}</span></h2><p className="mt-1 text-xs text-ink-muted">Member yang masih berada di gym</p></div><Clock3 size={18} className="text-primary" /></div><div className="divide-y divide-line">{activeUnavailable && <p role="alert" className="p-3 text-sm text-danger">Kunjungan aktif gagal dimuat. <button type="button" className="underline" onClick={() => router.refresh()}>Coba lagi</button></p>}{active.length === 0 && activeUnavailable ? null : active.length === 0 ? <div className="p-6 text-center text-sm text-ink-muted">Belum ada member di dalam gym.</div> : active.map((item) => <div key={item.id} className="flex items-center gap-3 px-4 py-3 sm:px-5"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-tint text-success"><LogIn size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{memberInfo(item)?.full_name ?? "Member"}</p><p className="text-xs text-ink-faint">{memberInfo(item)?.member_code ?? "-"} · <span suppressHydrationWarning>{durationSince(item.occurred_at)}</span></p></div><button type="button" disabled={pending || !item.member_id} onClick={() => { if (item.member_id && window.confirm("Check-out member ini?")) submitIdentifier(item.member_id, "manual", "OUT"); }} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-line px-2.5 text-xs font-medium text-ink-muted hover:border-primary hover:text-primary"><LogOut size={14} />Keluar</button></div>)}</div></Card>
+      <Card className="overflow-hidden"><div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-5"><div><h2 className="text-base font-semibold text-ink">Recent Attendance</h2><p className="mt-1 text-xs text-ink-muted">Aktivitas terbaru di {branchName}</p></div><ShieldCheck size={18} className="text-primary" /></div><div className="divide-y divide-line">{historyUnavailable && <p role="alert" className="p-3 text-sm text-danger">Riwayat gagal dimuat. <button type="button" className="underline" onClick={() => router.refresh()}>Coba lagi</button></p>}{recent.length === 0 && historyUnavailable ? null : recent.length === 0 ? <div className="p-8 text-center text-sm text-ink-muted">Belum ada attendance.</div> : recent.map((item) => <div key={item.id} className="flex items-center gap-3 px-4 py-3 sm:px-5"><div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.status === "success" ? "bg-success-tint text-success" : "bg-danger-tint text-danger"}`}>{item.attendance_status === "active" ? <LogIn size={17} /> : item.check_out_at ? <LogOut size={17} /> : item.status === "success" ? <CheckCircle2 size={17} /> : <CircleOff size={17} />}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{memberInfo(item)?.full_name ?? "Member"}</p><p className="truncate text-xs text-ink-faint">{memberInfo(item)?.member_code ?? "-"} · {item.attendance_status ?? item.status}</p></div><div className="text-right"><p className="text-xs font-medium text-ink">{item.occurred_at && Number.isFinite(Date.parse(item.occurred_at)) ? historyTime.format(new Date(item.occurred_at)) : "-"}</p><p className="mt-0.5 text-[11px] capitalize text-ink-faint">{item.source ?? item.method ?? "manual"}</p></div></div>)}</div></Card></div>
   </div>;
 }

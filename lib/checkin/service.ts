@@ -21,6 +21,7 @@ export type CheckInServiceResult = {
   action?: string;
   attendanceStatus?: string | null;
   attendanceId?: string | null;
+  memberId?: string;
   checkInAt?: string | null;
   checkOutAt?: string | null;
   durationSeconds?: number | null;
@@ -50,6 +51,7 @@ export async function checkIn({
   direction?: AttendanceDirection;
 }): Promise<CheckInServiceResult> {
   const ctx = await requirePermission("checkin.manage");
+  if (ctx.isDemo || !ctx.branches.some(branch => branch.id === branchId)) return { error: "Cabang tidak tersedia untuk check-in." };
   const supabase = await createClient();
   const normalized = normalizeIdentifier(identifier);
   if (!normalized.value) return { error: "Identifier check-in kosong." };
@@ -86,5 +88,6 @@ export async function checkIn({
   });
   if (error) return { error: error.message, source, allowAccess: false };
   const row = Array.isArray(data) ? data[0] : data;
-  return { result_status: row.result_status, denial_reason: row.denial_reason, member_name: row.member_name, plan_name: row.plan_name, valid_until: row.valid_until, branch_name: row.branch_name, source, action: row.result_action, attendanceStatus: row.attendance_status, attendanceId: row.attendance_id, checkInAt: row.check_in_at, checkOutAt: row.check_out_at, durationSeconds: row.duration_seconds, checkInTime: row.check_in_at, allowAccess: row.result_status === "success" && row.result_action !== "no_active_visit" };
+  if (!row) return { error: "Layanan attendance tidak mengembalikan hasil.", source, allowAccess: false };
+  return { result_status: row.result_status, denial_reason: row.denial_reason, member_name: row.member_name, plan_name: row.plan_name, valid_until: row.valid_until, branch_name: row.branch_name, source, action: row.result_action, attendanceStatus: row.attendance_status, attendanceId: row.attendance_id, memberId, checkInAt: row.check_in_at, checkOutAt: row.check_out_at, durationSeconds: row.duration_seconds, checkInTime: row.check_in_at, allowAccess: row.result_status === "success" && row.result_action !== "no_active_visit" };
 }
