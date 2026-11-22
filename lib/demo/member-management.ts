@@ -25,7 +25,7 @@ export type Profile = { name: string; phone: string; email: string; birth: strin
 export type Activity = { id: string; type: string; description: string; at: string };
 export type Visit = { id: string; at: string; out?: string; branchId?: string };
 export type FollowUp = { staff: string; method: string; date: string; notes: string; next: string; status: string };
-export type PtBooking = { id: string; at: string; createdAt: string; status: "Reserved" | "Completed" | "Cancelled" };
+export type PtBooking = { id: string; at: string; createdAt: string; branchId?: string; status: "Reserved" | "Completed" | "Cancelled" };
 export type Member = Profile & {
   id: string;
   branchId: string;

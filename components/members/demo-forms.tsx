@@ -7,6 +7,7 @@ import { TrainerDrawer as Drawer } from "@/components/trainers/trainer-drawer";
 import { formatCurrency } from "@/lib/format";
 import { activity, addDays, blankProfile, current, followStatuses, newMember, packageFor, packages, payments, phoneKey, profileError, type FollowUp, type Member, type Membership, type Profile } from "@/lib/demo/member-management";
 import { useMemberDemo } from "./demo-provider";
+import { useBranchDemo } from "@/components/branches/demo-provider";
 import { Avatar, dateLabel, Facts } from "./demo-ui";
 
 export type Save = (message: string) => void;
@@ -27,6 +28,8 @@ const makeMembership = (packageId: string, start: string, end: string, price: nu
 
 export function MemberForm({ member, branchId, close, saved, limit }: Common & { member?: Member; branchId: string }) {
   const demo = useMemberDemo();
+  const scope = useBranchDemo();
+  const activeBranches = scope?.active.filter(branch => scope.scopedIds.includes(branch.id)) ?? [];
   const [id] = useState(() => member?.id ?? newId());
   const [packageId, setPackage] = useState("");
   const [start, setStart] = useState(demo.today);
@@ -42,6 +45,11 @@ export function MemberForm({ member, branchId, close, saved, limit }: Common & {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const home = member?.branchId ?? (value(data, "homeBranch") || branchId);
+    if (scope && !member && !activeBranches.some(branch => branch.id === home)) return setError("Select an active home branch.");
+    const availableExtras = scope?.owner ? scope.active : [];
+    const extra = data.getAll("allowedBranches").map(String).filter(id => availableExtras.some(branch => branch.id === id));
+    const allowedBranchIds = scope?.owner ? [...new Set([home, ...extra, ...(member?.allowedBranchIds ?? []).filter(id => !availableExtras.some(branch => branch.id === id))])] : member?.allowedBranchIds;
     const next: Profile = { name: value(data, "name"), phone: value(data, "phone"), email: value(data, "email"), birth: value(data, "birth"), gender: value(data, "gender"), address: value(data, "address"), emergency: value(data, "emergency"), photo };
     const invalid = profileError(next);
     if (invalid) return setError(invalid);
@@ -51,10 +59,10 @@ export function MemberForm({ member, branchId, close, saved, limit }: Common & {
       ? makeMembership(plan.id, start, end, plan.price, value(data, "method"))
       : undefined;
     const result = demo.update(items => {
-      if (!member) return [...items, newMember(next, id, branchId, demo.today, membership)];
+      if (!member) return [...items, { ...newMember(next, id, home, demo.today, membership), allowedBranchIds }];
       return items.map(item => {
         if (item.id !== id) return item;
-        const updated = activity({ ...item, ...next }, "Member Updated", "Profile information updated");
+        const updated = activity({ ...item, ...next, allowedBranchIds }, "Member Updated", "Profile information updated");
         if (!membership || !plan || item.memberships.length) return updated;
         return activity({ ...updated, memberships: [membership] }, "Membership Purchased", plan.name);
       });
@@ -70,6 +78,7 @@ export function MemberForm({ member, branchId, close, saved, limit }: Common & {
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Full Name"><Input name="name" defaultValue={profile.name} required maxLength={100} /></Field>
         <Field label="Member ID"><Input value={id} readOnly /></Field>
+        {!!activeBranches.length && !member && <Field label="Home Branch"><Select name="homeBranch" defaultValue={branchId}>{activeBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</Select></Field>}
         <Field label="Phone Number"><Input name="phone" type="tel" defaultValue={profile.phone} required /></Field>
         <Field label="Email"><Input name="email" type="email" defaultValue={profile.email} /></Field>
         <Field label="Date of Birth"><Input name="birth" type="date" defaultValue={profile.birth} max={demo.today} /></Field>
@@ -97,6 +106,8 @@ export function MemberForm({ member, branchId, close, saved, limit }: Common & {
           </div>}
         </div>
       </div>
+      {scope?.owner && <fieldset className="flex flex-wrap gap-3"><legend className="mb-2 text-sm font-medium">Additional allowed branches</legend>{scope.active.map(branch =>
+        <label key={branch.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="allowedBranches" value={branch.id} defaultChecked={member?.allowedBranchIds?.includes(branch.id)} />{branch.name}</label>)}</fieldset>}
       {canAssignMembership && <fieldset className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
         <legend className="text-sm font-medium">Membership (optional)</legend>
         <Field label="Package"><Select value={packageId} onChange={e => { setPackage(e.target.value); setEnd(""); }}>

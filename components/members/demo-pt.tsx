@@ -29,6 +29,8 @@ export function DemoMemberPT({ id, view, ...initialScope }: DemoScope & { id: st
   if (!scope.canView || !scope.canViewPT || !member?.pt || !trainer || !plan) return <EmptyState title="PT schedule unavailable" action={<LinkButton href="/members">Back to Members</LinkButton>} />;
 
   const sessions = member.pt.bookings;
+  const availableBranches = branch?.active.filter(item => scope.branchIds.includes(item.id) && (member.allowedBranchIds ?? [member.branchId]).includes(item.id)) ?? [{ id: member.branchId, name: member.branchId }];
+  const visibleSessions = sessions.filter(item => scope.branchIds.includes(item.branchId ?? member.branchId));
   const minDate = addDays(demo.today, 1);
   const slots = ptSlots.filter(slot => slot.trainerId === trainer.id && slot.available);
   const list = `/pt-clients?view=bookings&member=${id}`;
@@ -51,8 +53,10 @@ export function DemoMemberPT({ id, view, ...initialScope }: DemoScope & { id: st
     const data = new FormData(event.currentTarget);
     const date = String(data.get("date"));
     const time = String(data.get("time"));
+    const branchId = String(data.get("branchId"));
     const at = `${date}T${time}:00+07:00`;
     if (!member || !trainer || !plan) return;
+    if (!availableBranches.some(item => item.id === branchId)) return setError("Choose an active branch covered by this membership.");
     if (!["Active", "Expiring Soon"].includes(status(member, demo.today)) || date > current(member, demo.today).end) {
       return setError("Choose a date covered by an active gym membership.");
     }
@@ -62,7 +66,7 @@ export function DemoMemberPT({ id, view, ...initialScope }: DemoScope & { id: st
     }
     if (available <= 0) return setError("All sessions are used or reserved.");
     const createdAt = new Date().toISOString();
-    const entry: PtBooking = { id: `PT-${crypto.randomUUID().slice(0, 8)}`, at, createdAt, status: "Reserved" };
+    const entry: PtBooking = { id: `PT-${crypto.randomUUID().slice(0, 8)}`, at, createdAt, branchId, status: "Reserved" };
     demo.update(items => items.map(item => item.id === id && item.pt ? activity({
       ...item, pt: { ...item.pt, bookings: [entry, ...item.pt.bookings] },
     }, "PT Session Reserved", `${entry.id} · ${trainer.name}`, createdAt) : item));
@@ -75,13 +79,13 @@ export function DemoMemberPT({ id, view, ...initialScope }: DemoScope & { id: st
       description={`${member.name} · ${trainer.name} · ${available} sessions available`}
       actions={<><LinkButton href={`/members/${id}?tab=personal-training`} variant="secondary">Back to Member</LinkButton>
         <LinkButton href={view === "calendar" ? list : calendar} variant="secondary">{view === "calendar" ? "Manage Booking" : "View Schedule"}</LinkButton>
-        {view === "bookings" && scope.canManagePT && <Button onClick={() => { setError(""); setBooking(true); }} disabled={!available}>Reserve Session</Button>}
+        {view === "bookings" && scope.canManagePT && <Button onClick={() => { setError(""); setBooking(true); }} disabled={available <= 0 || !availableBranches.length}>Reserve Session</Button>}
       </>} />
     {message && <p role="status" className="rounded-lg bg-primary-tint p-3 text-sm">{message}</p>}
-    {view === "calendar" ? <ScheduleCalendar title="PT Schedule" initialDate={demo.today} events={sessions.filter(item => item.status !== "Cancelled").map(item => ({
+    {view === "calendar" ? <ScheduleCalendar title="PT Schedule" initialDate={demo.today} events={visibleSessions.filter(item => item.status !== "Cancelled").map(item => ({
       id: item.id, title: `${plan.name} · ${trainer.name}`, date: item.at.slice(0, 10), time: item.at.slice(11, 16), status: item.status,
-    }))} /> : <Card><MemberTable headers={["Booking", "Date & Time", "Status", "Action"]} mobile
-      rows={sessions.map(item => ({ id: item.id, cells: [item.id, dateTimeLabel(item.at), item.status,
+    }))} /> : <Card><MemberTable headers={["Booking", "Branch", "Date & Time", "Status", "Action"]} mobile
+      rows={visibleSessions.map(item => ({ id: item.id, cells: [item.id, branch?.allowed.find(location => location.id === (item.branchId ?? member.branchId))?.name ?? "—", dateTimeLabel(item.at), item.status,
         scope.canManagePT && item.status === "Reserved" && item.at.slice(0, 10) >= demo.today ? <Button key="cancel" variant="secondary" size="sm" onClick={() => setSelected(item)}>Cancel Booking</Button> : "—",
       ] }))} empty="No PT bookings" /></Card>}
     {selected && <ConfirmDialog open title="Cancel PT booking?" description={`Cancel the session on ${dateTimeLabel(selected.at)} and release its reserved slot.`}
@@ -90,6 +94,7 @@ export function DemoMemberPT({ id, view, ...initialScope }: DemoScope & { id: st
       <form className="space-y-4" onSubmit={create}>
         <p className="text-sm text-ink-muted">Book with fixed trainer {trainer.name} in WIB.</p>
         <Field label="Session Date"><Input type="date" name="date" min={minDate} required /></Field>
+        <Field label="Branch"><Select name="branchId" required>{availableBranches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>
         <Field label="Available Time"><Select name="time" required>{slots.map(slot => <option key={slot.time}>{slot.time}</option>)}</Select></Field>
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <Footer close={() => setBooking(false)} label="Reserve Session" />
