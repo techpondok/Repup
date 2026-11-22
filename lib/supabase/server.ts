@@ -1,8 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { liveAuthEnabled, liveAuthUnavailable } from "@/lib/auth-mode";
 
 export async function createClient() {
   const cookieStore = await cookies();
+  if (!liveAuthEnabled()) throw new Error(liveAuthUnavailable);
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

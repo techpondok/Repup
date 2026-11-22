@@ -6,7 +6,7 @@ import { getTenantContext } from "@/lib/tenant";
 
 export default async function PlatformDemoPage() {
   const cookieStore = await cookies();
-  if (cookieStore.get("ru_demo")?.value !== "1") redirect("/demo");
+  if (process.env.APP_DEMO_ENABLED === "false" || cookieStore.get("ru_demo")?.value !== "1") redirect("/demo");
   const ctx = await getTenantContext();
   const role = getDemoRole(cookieStore.get("ru_demo_role")?.value);
   if (DEMO_ROLES[role].scope !== "platform") redirect("/dashboard");

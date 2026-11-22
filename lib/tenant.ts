@@ -27,7 +27,7 @@ export interface TenantContext {
  */
 export async function getTenantContext(): Promise<TenantContext> {
   const cookieStore = await cookies();
-  if (cookieStore.get("ru_demo")?.value === "1") {
+  if (process.env.APP_DEMO_ENABLED !== "false" && cookieStore.get("ru_demo")?.value === "1") {
     const role = getDemoRole(cookieStore.get("ru_demo_role")?.value);
     const roleConfig = DEMO_ROLES[role];
     const demoOrg = { id: "demo-org-powerhouse", name: "PowerHouse Fitness", legal_name: null, owner_id: "demo-user", billing_email: "demo@repup.local", onboarding_step: "complete", created_at: "", updated_at: "", archived_at: null, business_type: "gym_fitness_center", timezone: "Asia/Jakarta", currency: "IDR", is_demo: true } as any;

@@ -4,10 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { DEMO_ROLES, getDemoRole } from "@/lib/demo/roles";
+import { isAuthCookie, liveAuthEnabled, liveAuthUnavailable } from "@/lib/auth-mode";
 
 export type ActionState = { error?: string } | null;
 
 export async function signIn(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!liveAuthEnabled()) return { error: liveAuthUnavailable };
   const email = String(formData.get("email") || "").trim();
   const password = String(formData.get("password") || "");
 
@@ -40,6 +42,7 @@ export async function switchDemoRole(formData: FormData) {
 }
 
 export async function signUp(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!liveAuthEnabled()) return { error: liveAuthUnavailable };
   const fullName = String(formData.get("full_name") || "").trim();
   const email = String(formData.get("email") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
@@ -68,13 +71,14 @@ export async function signUp(_prev: ActionState, formData: FormData): Promise<Ac
 export async function signOut() {
   const cookieStore = await cookies();
   const isDemo = cookieStore.get("ru_demo")?.value === "1";
-  const hasAuthCookie = cookieStore.getAll().some(({ name }) => /^sb-.+-auth-token(?:\.\d+)?$/.test(name));
+  const authCookies = cookieStore.getAll().filter(({ name }) => isAuthCookie(name));
   // A demo cookie can coexist with a real login. End this device's session too.
-  if (!isDemo || hasAuthCookie) {
+  if (liveAuthEnabled() && (!isDemo || authCookies.length)) {
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw new Error("Gagal keluar. Coba lagi.");
   }
+  if (!liveAuthEnabled()) authCookies.forEach(({ name }) => cookieStore.delete(name));
   for (const name of ["ru_demo", "ru_demo_role", "ru_org_id", "ru_branch_id"]) cookieStore.delete(name);
   redirect("/login");
 }
@@ -87,6 +91,7 @@ export async function resetDemo() {
 }
 
 export async function requestPasswordReset(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!liveAuthEnabled()) return { error: liveAuthUnavailable };
   const email = String(formData.get("email") || "").trim();
   if (!email) return { error: "Masukkan email Anda." };
 
@@ -100,6 +105,7 @@ export async function requestPasswordReset(_prev: ActionState, formData: FormDat
 }
 
 export async function updatePassword(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!liveAuthEnabled()) return { error: liveAuthUnavailable };
   const password = String(formData.get("password") || "");
   if (password.length < 8) return { error: "Kata sandi minimal 8 karakter." };
 

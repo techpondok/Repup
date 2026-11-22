@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
+import { liveAuthEnabled } from "@/lib/auth-mode";
 
 export default async function OnboardingPage() {
+  if (!liveAuthEnabled()) redirect("/login");
   const supabase = await createClient();
   const {
     data: { user },

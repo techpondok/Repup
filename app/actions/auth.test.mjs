@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 const source=ts.transpileModule(fs.readFileSync(new URL('./auth.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
-function setup(values={},failure=null){
+function setup(values={},failure=null,live=true){
  const jar=new Map(Object.entries(values));const calls=[];const exported={};
  const store={get:name=>jar.has(name)?{value:jar.get(name)}:undefined,getAll:()=>[...jar].map(([name,value])=>({name,value})),delete:name=>jar.delete(name)};
  const modules={
@@ -12,8 +12,9 @@ function setup(values={},failure=null){
   'next/headers':{cookies:async()=>store},
   'next/navigation':{redirect:path=>{throw new Error(`REDIRECT:${path}`);}},
   '@/lib/demo/roles':{},
+  '@/lib/auth-mode':{liveAuthEnabled:()=>live,liveAuthUnavailable:'Login akun belum tersedia.',isAuthCookie:name=>/^sb-.+-auth-token(?:\.\d+)?$/.test(name)},
  };
- vm.runInNewContext(source,{exports:exported,require:name=>modules[name]});return {signOut:exported.signOut,jar,calls};
+ vm.runInNewContext(source,{exports:exported,require:name=>modules[name]});return {actions:exported,signOut:exported.signOut,jar,calls};
 }
 test('demo logout clears role and tenant cookies then returns to login without an auth service',async()=>{
  const ctx=setup({ru_demo:'1',ru_demo_role:'MEMBER',ru_org_id:'demo-org',ru_branch_id:'demo-branch'});
@@ -34,4 +35,13 @@ test('unrelated cookies do not trigger real auth during demo logout',async()=>{
 test('auth failure stays retryable and never reports a successful logout',async()=>{
  const ctx=setup({ru_demo:'1','sb-project-auth-token':'fictional-token'},{message:'private service error'});
  await assert.rejects(ctx.signOut(),/^Error: Gagal keluar/);assert.equal(ctx.jar.get('ru_demo'),'1');
+});
+test('offline auth actions refuse live requests and logout only clears local cookies',async()=>{
+ const ctx=setup({'sb-project-auth-token.0':'fictional-token'},null,false);
+ for(const action of ['signIn','signUp','requestPasswordReset','updatePassword']) {
+  assert.match((await ctx.actions[action](null,new FormData())).error,/belum tersedia/);
+ }
+ await assert.rejects(ctx.signOut(),/REDIRECT:\/login/);
+ assert.equal(ctx.jar.size,0);
+ assert.equal(ctx.calls.length,0);
 });
