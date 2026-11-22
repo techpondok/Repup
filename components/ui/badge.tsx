@@ -13,11 +13,14 @@ const toneClass: Record<Tone, string> = {
 
 export function Badge({ tone = "neutral", children, className }: { tone?: Tone; children: React.ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", toneClass[tone], className)}>
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium", toneClass[tone], className)}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
       {children}
     </span>
   );
 }
+
+export const StatusBadge = Badge;
 
 const MEMBER_STATUS_TONE: Record<string, Tone> = {
   active: "success",

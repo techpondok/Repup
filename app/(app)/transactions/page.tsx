@@ -1,3 +1,4 @@
+import { DataTable } from "@/components/ui/data-table";
 import Link from "next/link";
 import { getTenantContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
@@ -39,7 +40,7 @@ export default async function TransactionsPage({
         {!transactions || transactions.length === 0 ? (
           <EmptyState title="Belum ada transaksi" description="Transaksi akan muncul di sini setelah kasir memproses penjualan." />
         ) : (
-          <table className="w-full text-sm">
+          <DataTable className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-faint">
                 <th className="px-4 py-3 font-medium">Invoice</th>
@@ -68,7 +69,7 @@ export default async function TransactionsPage({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
         )}
       </Card>
     </div>

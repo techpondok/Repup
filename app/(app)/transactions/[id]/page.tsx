@@ -1,9 +1,11 @@
+import { DataTable } from "@/components/ui/data-table";
 import { notFound } from "next/navigation";
 import { getTenantContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, SectionLabel } from "@/components/ui/layout-bits";
 import { TransactionStatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { TransactionMemberForm } from "@/components/pos/transaction-member-form";
 
 const METHOD_LABEL: Record<string, string> = { cash: "Tunai", transfer: "Transfer", qris: "QRIS", other: "Lainnya" };
 
@@ -12,7 +14,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   const ctx = await getTenantContext();
   const supabase = await createClient();
 
-  const { data: txn } = await supabase.from("transactions").select("*, members(full_name, member_code)").eq("id", id).single();
+  const { data: txn } = await supabase.from("transactions").select("*, members(full_name, member_code)").eq("id", id).eq("organization_id", ctx.organization.id).single();
   if (!txn) notFound();
 
   const { data: items } = await supabase.from("transaction_items").select("*").eq("transaction_id", id);
@@ -29,7 +31,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
           <SectionLabel>Item</SectionLabel>
-          <table className="w-full text-sm">
+          <DataTable className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-faint">
                 <th className="py-2 font-medium">Deskripsi</th>
@@ -48,7 +50,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
                 </tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
 
           <div className="mt-4 ml-auto max-w-xs space-y-1.5 border-t border-line pt-4 text-sm">
             <div className="flex justify-between">
@@ -86,6 +88,9 @@ export default async function TransactionDetailPage({ params }: { params: Promis
               <dd className="text-ink capitalize">{txn.transaction_type.replace("_", " ")}</dd>
             </div>
           </dl>
+          {ctx.isOrgWide && !ctx.isDemo && txn.transaction_type === "sale" &&
+            <TransactionMemberForm key={txn.member_id ?? "walk-in"} transactionId={txn.id}
+              currentMemberCode={txn.members?.member_code ?? ""} currentMemberId={txn.member_id} />}
         </Card>
       </div>
     </div>

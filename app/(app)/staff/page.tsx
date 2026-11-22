@@ -1,3 +1,4 @@
+import { DataTable } from "@/components/ui/data-table";
 import { getTenantContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui/layout-bits";
@@ -33,7 +34,7 @@ export default async function StaffPage() {
             {!staff || staff.length === 0 ? (
               <EmptyState title="Belum ada staff" />
             ) : (
-              <table className="w-full text-sm">
+              <DataTable className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs text-ink-faint">
                     <th className="px-4 py-3 font-medium">Nama</th>
@@ -56,7 +57,7 @@ export default async function StaffPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
             )}
           </Card>
         </div>

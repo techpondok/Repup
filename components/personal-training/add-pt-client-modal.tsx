@@ -14,6 +14,7 @@ export function AddPtClientModal({ organizationId, locationId, members, coaches,
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [planId, setPlanId] = useState("");
+  const [customSessions, setCustomSessions] = useState("");
   const selectedPlan = plans.find((plan) => plan.id === planId);
 
   const form = <form action={(fd) => startTransition(async () => { const result = await createPtClient(fd); if (result.error) { setError(result.error); return; } router.refresh(); window.dispatchEvent(new Event("repup:crud-success")); })} className="space-y-3">
@@ -22,7 +23,10 @@ export function AddPtClientModal({ organizationId, locationId, members, coaches,
     <div><Label htmlFor="pt-coach">Trainer *</Label><Select id="pt-coach" name="trainer_id" required defaultValue=""><option value="">Pilih trainer</option>{coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.name}</option>)}</Select></div>
     <div><Label htmlFor="pt-plan">PT Package *</Label><Select id="pt-plan" name="package_plan_id" required value={planId} onChange={(event) => setPlanId(event.target.value)}><option value="">Pilih paket</option>{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}{plan.price ? ` · Rp${plan.price.toLocaleString("id-ID")}` : ""}</option>)}</Select></div>
     <div className="grid grid-cols-2 gap-3"><div><Label htmlFor="pt-start">Start Date *</Label><Input id="pt-start" name="start_date" type="date" required /></div><div><Label htmlFor="pt-end">Expiry Date</Label><Input id="pt-end" name="end_date" type="date" /></div></div>
-    <div><Label htmlFor="pt-sessions">Sessions</Label><Input id="pt-sessions" name="sessions_total" type="number" min="1" required value={selectedPlan?.visit_limit ?? ""} readOnly={Boolean(selectedPlan?.visit_limit)} onChange={() => undefined} placeholder="Jumlah sesi" /></div>
+    <div><Label htmlFor="pt-sessions">Sessions</Label><Input id="pt-sessions" name="sessions_total" type="number" min="1" required value={selectedPlan?.visit_limit ?? customSessions} readOnly={selectedPlan?.visit_limit != null} onChange={event => setCustomSessions(event.target.value)} placeholder="Jumlah sesi" /></div>
+    <div><Label htmlFor="pt-duration">Session Duration</Label><Select id="pt-duration" name="session_duration" defaultValue="">
+      <option value="">Use package or trainer default</option>{[30,45,60,90].map(duration => <option value={duration} key={duration}>{duration} minutes</option>)}
+    </Select></div>
     <p className="text-xs text-ink-muted">Harga paket: {selectedPlan?.price ? `Rp${selectedPlan.price.toLocaleString("id-ID")}` : "Pilih paket terlebih dahulu"}</p>
     <div><Label htmlFor="pt-goal">Training Goal</Label><Input id="pt-goal" name="goal" placeholder="Opsional" /></div><div><Label htmlFor="pt-notes">Notes</Label><Textarea id="pt-notes" name="notes" rows={2} placeholder="Opsional" /></div>
     <div><Label htmlFor="pt-reason">Alasan assignment *</Label><Input id="pt-reason" name="reason" required placeholder="Contoh: Complimentary package / migration" /></div>

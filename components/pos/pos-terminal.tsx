@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Trash2, User, X } from "lucide-react";
 import { Input, Select } from "@/components/ui/field";
@@ -31,20 +31,26 @@ export function PosTerminal({
   branchId,
   items,
   currency,
+  initialMember,
 }: {
   organizationId: string;
   gymId: string;
   branchId: string;
   items: SellableItem[];
   currency: string;
+  initialMember?: MemberHit | null;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [memberQuery, setMemberQuery] = useState("");
   const [memberResults, setMemberResults] = useState<MemberHit[]>([]);
-  const [selectedMember, setSelectedMember] = useState<MemberHit | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberHit | null>(initialMember ?? null);
+  const [memberSearchState, setMemberSearchState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [cart, setCart] = useState<(CartItem & { key: string })[]>([]);
   const [discount, setDiscount] = useState(0);
+  const [cashTendered, setCashTendered] = useState("");
+  const request = useRef<{ key: string; id: string } | null>(null);
+  const submitting = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer" | "qris" | "other">("cash");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -58,14 +64,14 @@ export function PosTerminal({
 
   function addToCart(item: SellableItem) {
     setCart((prev) => {
-      const existing = prev.find((c) => c.key === item.id && !item.membership_plan_id);
+      const existing = prev.find((c) => c.product_id === item.product_id && !!item.product_id);
       if (existing && !item.membership_plan_id) {
-        return prev.map((c) => (c.key === item.id ? { ...c, quantity: c.quantity + 1 } : c));
+        return prev.map((c) => (c === existing ? { ...c, quantity: c.quantity + 1 } : c));
       }
       return [
         ...prev,
         {
-          key: item.id + "-" + prev.length,
+          key: crypto.randomUUID(),
           description: item.name,
           quantity: 1,
           unit_price: item.price,
@@ -80,43 +86,66 @@ export function PosTerminal({
     setCart((prev) => prev.filter((c) => c.key !== key));
   }
 
-  async function runMemberSearch(q: string) {
-    setMemberQuery(q);
-    if (q.trim().length < 2) {
-      setMemberResults([]);
-      return;
-    }
-    const res = await searchMembersForPos(organizationId, branchId, q);
-    setMemberResults(res as MemberHit[]);
-  }
+  useEffect(() => {
+    if (memberQuery.trim().length < 2 || selectedMember) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      searchMembersForPos(organizationId, branchId, memberQuery).then(
+        results => { if (active) { setMemberResults(results); setMemberSearchState("done"); } },
+        () => { if (active) setMemberSearchState("error"); },
+      );
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [organizationId, branchId, memberQuery, selectedMember]);
 
   function handleCheckout() {
+    if (submitting.current || !cart.length) return;
     setError(null);
     const hasMembership = cart.some((c) => c.membership_plan_id);
     if (hasMembership && !selectedMember) {
       setError("Pilih member terlebih dahulu untuk pembelian membership.");
       return;
     }
+    const tendered = paymentMethod === "cash" && cashTendered !== "" ? Number(cashTendered) : null;
+    if (discount < 0 || discount > subtotal || (tendered !== null && (!Number.isFinite(tendered) || tendered < total))) {
+      setError("Periksa nominal diskon dan uang tunai.");
+      return;
+    }
+    const sale = {
+      organization_id: organizationId,
+      gym_id: gymId,
+      branch_id: branchId,
+      member_id: selectedMember?.id ?? null,
+      items: cart.map(({ product_id, membership_plan_id, description, quantity, unit_price }) =>
+        ({ product_id, membership_plan_id, description, quantity, unit_price })),
+      discount,
+      tax: 0,
+      payment_method: paymentMethod,
+      cash_tendered: tendered,
+    };
+    const key = JSON.stringify(sale);
+    const requestId = request.current?.key === key ? request.current.id : crypto.randomUUID();
+    request.current = { key, id: requestId };
+    submitting.current = true;
     startTransition(async () => {
-      const res = await checkoutSale({
-        organization_id: organizationId,
-        gym_id: gymId,
-        branch_id: branchId,
-        member_id: selectedMember?.id ?? null,
-        items: cart.map(({ key, ...rest }) => rest),
-        discount,
-        tax: 0,
-        payment_method: paymentMethod,
-      });
-      if (res.error) {
-        setError(res.error);
-        return;
+      try {
+        const res = await checkoutSale({ ...sale, request_id: requestId });
+        if (res.error || !res.invoice_number) {
+          setError(res.error ?? "Pembayaran belum dapat dikonfirmasi.");
+          return;
+        }
+        request.current = null;
+        setSuccess({ invoice_number: res.invoice_number });
+        setCart([]);
+        setDiscount(0);
+        setCashTendered("");
+        setSelectedMember(null);
+        router.refresh();
+      } catch {
+        setError("Pembayaran belum dapat dikonfirmasi. Coba lagi dengan keranjang yang sama.");
+      } finally {
+        submitting.current = false;
       }
-      setSuccess({ invoice_number: res.invoice_number! });
-      setCart([]);
-      setDiscount(0);
-      setSelectedMember(null);
-      router.refresh();
     });
   }
 
@@ -136,7 +165,8 @@ export function PosTerminal({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+    <fieldset disabled={pending} className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+      <legend className="sr-only">POS Checkout</legend>
       <div>
         <div className="relative mb-4">
           <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
@@ -169,23 +199,33 @@ export function PosTerminal({
       <Card className="flex h-fit flex-col p-4">
         <p className="mb-3 text-sm font-medium text-ink">Keranjang</p>
 
+        <p className="mb-2 text-sm font-medium text-ink">Select Customer / Member</p>
         {selectedMember ? (
           <div className="mb-3 flex items-center justify-between rounded-[6px] bg-primary-tint px-3 py-2">
             <div className="flex items-center gap-2 text-sm text-primary">
               <User size={14} />
               <span className="font-medium">{selectedMember.full_name}</span>
             </div>
-            <button onClick={() => setSelectedMember(null)}>
+            <button type="button" aria-label="Remove selected member" onClick={() => setSelectedMember(null)}>
               <X size={14} className="text-primary" />
             </button>
           </div>
         ) : (
           <div className="relative mb-3">
             <Input
-              placeholder="Cari member (opsional untuk walk-in)"
+              aria-label="Search members by name, member number, or phone"
+              placeholder="Nama, nomor member, atau telepon"
               value={memberQuery}
-              onChange={(e) => runMemberSearch(e.target.value)}
+              onChange={(e) => {
+                setMemberQuery(e.target.value);
+                setMemberResults([]);
+                setMemberSearchState(e.target.value.trim().length >= 2 ? "loading" : "idle");
+              }}
             />
+            {memberSearchState === "idle" && <p className="mt-1 text-xs text-ink-muted">Walk-in Customer</p>}
+            {memberSearchState === "loading" && <p role="status" className="mt-1 text-xs text-ink-muted">Mencari member…</p>}
+            {memberSearchState === "done" && !memberResults.length && <p role="status" className="mt-1 text-xs text-ink-muted">Member tidak ditemukan.</p>}
+            {memberSearchState === "error" && <p role="alert" className="mt-1 text-xs text-danger">Pencarian gagal. Coba ubah kata pencarian.</p>}
             {memberResults.length > 0 && (
               <div className="absolute z-10 mt-1 w-full rounded-md border border-line bg-surface py-1 shadow-sm">
                 {memberResults.map((m) => (
@@ -195,6 +235,7 @@ export function PosTerminal({
                       setSelectedMember(m);
                       setMemberResults([]);
                       setMemberQuery("");
+                      setMemberSearchState("idle");
                     }}
                     className="block w-full px-3 py-1.5 text-left text-sm hover:bg-canvas"
                   >
@@ -254,12 +295,16 @@ export function PosTerminal({
           </Select>
         </div>
 
+        {paymentMethod === "cash" && <label className="mt-3 text-sm text-ink">Uang diterima (opsional)
+          <Input className="mt-1" type="number" min={total} step="any" value={cashTendered} placeholder="Kosongkan jika uang pas" onChange={event => setCashTendered(event.target.value)} />
+          {cashTendered !== "" && Number(cashTendered) >= total && <span className="mt-1 block text-xs text-ink-muted">Kembalian {formatCurrency(Number(cashTendered) - total, currency)}</span>}
+        </label>}
         {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
         <Button className="mt-4 w-full" size="md" disabled={cart.length === 0 || pending} onClick={handleCheckout}>
           {pending ? "Memproses..." : "Selesaikan Pembayaran"}
         </Button>
       </Card>
-    </div>
+    </fieldset>
   );
 }

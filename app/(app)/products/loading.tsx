@@ -1,0 +1,2 @@
+import {LoadingSkeleton} from '@/components/ui/layout-bits';
+export default function Loading(){return <div role="status" className="space-y-5"><span className="sr-only">Loading products</span><LoadingSkeleton className="h-12 w-56"/><LoadingSkeleton className="h-28"/><div className="grid gap-5 md:grid-cols-3"><LoadingSkeleton className="h-80"/><LoadingSkeleton className="h-80"/><LoadingSkeleton className="h-80"/></div></div>;}

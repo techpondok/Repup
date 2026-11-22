@@ -27,7 +27,7 @@ export async function signInDemo(_prev: ActionState, formData: FormData): Promis
   const cookieStore = await cookies();
   cookieStore.set("ru_demo", "1", { path: "/", httpOnly: true, sameSite: "lax" });
   cookieStore.set("ru_demo_role", role, { path: "/", httpOnly: true, sameSite: "lax" });
-  redirect(DEMO_ROLES[role].scope === "platform" ? "/platform" : "/dashboard");
+  redirect(role === "MEMBER" ? "/member/dashboard" : DEMO_ROLES[role].scope === "platform" ? "/platform" : "/dashboard");
 }
 
 export async function switchDemoRole(formData: FormData) {
@@ -36,7 +36,7 @@ export async function switchDemoRole(formData: FormData) {
   const role = getDemoRole(String(formData.get("role") || "OWNER"));
   if (DEMO_ROLES[role].scope !== "organization") redirect("/dashboard");
   cookieStore.set("ru_demo_role", role, { path: "/", httpOnly: true, sameSite: "lax" });
-  redirect("/dashboard");
+  redirect(role === "MEMBER" ? "/member/dashboard" : "/dashboard");
 }
 
 export async function signUp(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -67,13 +67,15 @@ export async function signUp(_prev: ActionState, formData: FormData): Promise<Ac
 
 export async function signOut() {
   const cookieStore = await cookies();
-  if (cookieStore.get("ru_demo")?.value === "1") {
-    cookieStore.delete("ru_demo");
-    cookieStore.delete("ru_demo_role");
-    redirect("/login");
+  const isDemo = cookieStore.get("ru_demo")?.value === "1";
+  const hasAuthCookie = cookieStore.getAll().some(({ name }) => /^sb-.+-auth-token(?:\.\d+)?$/.test(name));
+  // A demo cookie can coexist with a real login. End this device's session too.
+  if (!isDemo || hasAuthCookie) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
+    if (error) throw new Error("Gagal keluar. Coba lagi.");
   }
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  for (const name of ["ru_demo", "ru_demo_role", "ru_org_id", "ru_branch_id"]) cookieStore.delete(name);
   redirect("/login");
 }
 

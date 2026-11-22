@@ -1,0 +1,1 @@
+export default function Loading() { return <div className="mp-grid" role="status" aria-label="Loading member portal"><div className="mp-skeleton"/><div className="mp-skeleton" style={{height:280}}/><span className="sr-only">Loading…</span></div>; }

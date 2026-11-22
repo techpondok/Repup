@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui/layout-bits";
 import { PosTerminal } from "@/components/pos/pos-terminal";
 import { LinkButton } from "@/components/ui/button";
+import { StoreStaffBoundary } from "@/components/store/staff-boundary";
+import { CashierStore } from "@/components/store/cashier-store";
 
 const CATEGORY_LABEL: Record<string, string> = {
   membership: "Membership",
@@ -14,8 +16,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   other: "Lainnya",
 };
 
-export default async function PosPage() {
+export default async function PosPage({ searchParams }: { searchParams: Promise<{ member?: string }> }) {
   const ctx = await getTenantContext();
+  const requestedMember = (await searchParams).member;
+  if (ctx.isDemo) return <StoreStaffBoundary mode="cashier"><CashierStore key={requestedMember} initialMemberId={requestedMember} /></StoreStaffBoundary>;
 
   if (!ctx.branch) {
     return <EmptyState title="Belum ada cabang" description="Buat cabang terlebih dahulu untuk menggunakan kasir." />;
@@ -36,6 +40,10 @@ export default async function PosPage() {
     .eq("organization_id", ctx.organization.id)
     .eq("gym_id", ctx.branch.gym_id)
     .eq("is_active", true);
+
+  const { data: initialMember } = typeof requestedMember === "string" && /^[a-f0-9-]{36}$/i.test(requestedMember)
+    ? await supabase.from("members").select("id, full_name, member_code, phone").eq("id", requestedMember).eq("organization_id", ctx.organization.id).eq("branch_id", ctx.branch.id).neq("status", "archived").maybeSingle()
+    : { data: null };
 
   const gym = ctx.gyms.find((g) => g.id === ctx.branch!.gym_id);
 
@@ -78,6 +86,8 @@ export default async function PosPage() {
         />
       ) : (
         <PosTerminal
+          key={initialMember?.id ?? ctx.branch.id}
+          initialMember={initialMember}
           organizationId={ctx.organization.id}
           gymId={ctx.branch.gym_id}
           branchId={ctx.branch.id}

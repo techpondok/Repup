@@ -8,6 +8,7 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
   ({ className, ...props }, ref) => <input ref={ref} className={cn(controlClass, className)} {...props} />
 );
 Input.displayName = "Input";
+export const FormInput = Input;
 
 export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
   ({ className, ...props }, ref) => <textarea ref={ref} className={cn(controlClass, className)} {...props} />

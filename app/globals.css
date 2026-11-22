@@ -1,4 +1,26 @@
 @import "tailwindcss";
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-tint: var(--primary-tint);
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-amber: var(--amber);
+  --color-amber-tint: var(--amber-tint);
+  --color-info: var(--info);
+  --color-info-tint: var(--info-tint);
+}
 .app-shell h1,.app-shell h2{margin:0;font-size:1.875rem!important;font-weight:600;letter-spacing:-.025em;line-height:1.25}.app-shell h1 em,.app-shell h2 em{color:inherit;font-style:normal}
 .form-modal{width:calc(100vw - 2rem)!important;max-width:42rem!important;max-height:90vh!important;overflow:hidden}.form-modal-title{margin:0!important;font-size:1.125rem!important;line-height:1.5!important;letter-spacing:normal!important;font-weight:600!important}.form-modal p{font-size:.875rem;line-height:1.5}
 .dashboard-shell{background:#0b0d0b;color:#edf1e8}.dashboard-shell .bg-surface{background:#111511}.dashboard-shell .border-line{border-color:#293027}.dashboard-shell .border-line-strong{border-color:#465342}.dashboard-shell .text-ink{color:#edf1e8}.dashboard-shell .text-ink-muted{color:#9da99a}.dashboard-shell .text-ink-faint{color:#778476}.dashboard-shell select{background:#111511;color:#edf1e8;border-color:#465342}.dashboard-shell .bg-primary-tint{background:#202a1d}.dashboard-shell .text-primary{color:#c7f83a}.dashboard-shell .bg-primary{background:#c7f83a;color:#0b0d0b}.dashboard-shell .dashboard-kpi{box-shadow:inset 3px 0 #c7f83a}

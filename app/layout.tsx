@@ -1,6 +1,11 @@
+import { TrainerDemoProvider } from "@/components/trainers/trainer-demo-provider";
+import { ClassProvider } from '@/components/member/classes/class-provider';
+import { StoreProvider } from '@/components/store/store-provider';
+import { PTPreviewProvider } from '@/components/member/pt/pt-store';
 import type { Metadata } from "next";
 import "./globals.css";
 import "./ecosystem.css";
+import "./app-theme.css";
 
 export const metadata: Metadata = {
   title: "RepUp — Workout, Progress & Gym Platform",
@@ -11,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" data-scroll-behavior="smooth">
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning><StoreProvider><PTPreviewProvider><ClassProvider><TrainerDemoProvider>{children}</TrainerDemoProvider></ClassProvider></PTPreviewProvider></StoreProvider></body>
     </html>
   );
 }

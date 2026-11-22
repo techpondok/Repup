@@ -1,3 +1,4 @@
+import { DataTable } from "@/components/ui/data-table";
 import { getTenantContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui/layout-bits";
@@ -47,7 +48,7 @@ export default async function EquipmentPage() {
             {!equipment || equipment.length === 0 ? (
               <EmptyState title="Belum ada peralatan" description="Tambahkan peralatan seperti barbell, dumbbell, atau treadmill." />
             ) : (
-              <table className="w-full text-sm">
+              <DataTable className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs text-ink-faint">
                     <th className="px-4 py-3 font-medium">Peralatan</th>
@@ -73,7 +74,7 @@ export default async function EquipmentPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
             )}
           </Card>
         </div>

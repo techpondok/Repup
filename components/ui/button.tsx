@@ -6,7 +6,7 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md";
 
 const base =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[6px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 const variants: Record<Variant, string> = {
   primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
@@ -31,6 +31,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   )
 );
 Button.displayName = "Button";
+
+export function PrimaryButton(props: Omit<ButtonProps, "variant">) { return <Button {...props} variant="primary" />; }
+export function SecondaryButton(props: Omit<ButtonProps, "variant">) { return <Button {...props} variant="secondary" />; }
 
 export function LinkButton({
   href,

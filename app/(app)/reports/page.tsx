@@ -102,7 +102,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         }
       />
 
-      <Card className="mb-6 grid grid-cols-3">
+      <Card statGroup className="mb-6 grid grid-cols-3">
         <Stat label="Total Pendapatan" value={formatCurrency(totalRevenue, gym?.currency)} />
         <Stat label="Member Baru" value={String(totalNewMembers)} />
         <Stat label="Total Check-in" value={String(totalCheckins)} />

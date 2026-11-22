@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { FormModal } from "@/components/ui/form-modal";
 import {
   freezeMembership,
   unfreezeMembership,
@@ -44,7 +45,7 @@ export function MembershipActions({
         Kelola
       </button>
       {open && (
-        <div className="absolute right-0 z-10 mt-1 w-44 rounded-md border border-line bg-surface py-1 shadow-sm">
+        <FormModal open={open} title="Kelola membership" size="small" trigger={null} onClose={() => setOpen(false)}>
           {status === "active" && (
             <button
               onClick={() => run(() => freezeMembership(membershipId, organizationId))}
@@ -73,7 +74,7 @@ export function MembershipActions({
           >
             Batalkan
           </button>
-        </div>
+        </FormModal>
       )}
     </div>
   );

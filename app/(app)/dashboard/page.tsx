@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { getTenantContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
-import { Card, EmptyState } from "@/components/ui/layout-bits";
+import { Card, EmptyState, StatCard, AnalyticsCard } from "@/components/ui/layout-bits";
+import { RevenueChart } from "@/components/reports/charts";
 import { LinkButton } from "@/components/ui/button";
 import { MemberStatusBadge, TransactionStatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime, formatTime } from "@/lib/format";
-import { ShoppingCart, ScanLine, ArrowUpRight, CalendarDays, UserPlus } from "lucide-react";
+import { ShoppingCart, ScanLine, ArrowUpRight, CalendarDays, UserPlus, Users, Wallet, IdCard } from "lucide-react";
 import DemoDashboard from "@/components/demo-dashboard";
 
 function greeting() {
@@ -77,7 +78,7 @@ export default async function DashboardPage() {
   const revenueToday = (todaysTxns ?? []).reduce((s, t: any) => s + Number(t.total), 0);
 
   return (
-    <div className="dashboard-shell -m-6 min-h-full p-6">
+    <div className="dashboard-shell min-h-full">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">Ringkasan bisnis</p>
@@ -86,11 +87,28 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-1 text-sm text-ink-muted">{ctx.organization.name} · {ctx.branch?.name ?? "Semua lokasi"}</p>
         </div>
-        <div className="flex items-center gap-2"><select className="rounded-[6px] border border-line-strong bg-surface px-3 py-2 text-sm text-ink" defaultValue={ctx.branch?.id ?? "all"}><option value="all">Semua lokasi</option>{ctx.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><div className="hidden rounded-[6px] border border-line-strong bg-surface p-1 sm:flex"><button className="rounded bg-primary-tint px-2.5 py-1.5 text-xs font-medium text-primary">Hari ini</button><button className="px-2.5 py-1.5 text-xs text-ink-muted">7 hari</button><button className="px-2.5 py-1.5 text-xs text-ink-muted">30 hari</button></div></div>
+        <LinkButton href="/reports" variant="secondary" size="sm">Lihat laporan <ArrowUpRight size={14} /></LinkButton>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[["Total member", String(activeMembers ?? 0), "+12%", "+46 bulan ini"], ["Check-in hari ini", String(checkinsToday ?? 0), "+8%", "dari member aktif"], ["Pendapatan hari ini", formatCurrency(revenueToday, currency), "+18%", "vs periode lalu"], ["Membership akan expire", String(expiringSoon ?? 0), "", "dalam 30 hari"]].map(([label, value, delta, detail]) => <Card key={label} className="p-4"><p className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</p><div className="mt-3 flex items-end justify-between gap-2"><strong className="num text-2xl font-semibold tracking-tight text-ink">{value}</strong>{delta && <span className="rounded bg-primary-tint px-1.5 py-1 text-[11px] font-medium text-primary">↑ {delta}</span>}</div><p className="mt-2 text-xs text-ink-muted">{detail}</p></Card>)}
+        <StatCard label="Member aktif" value={String(activeMembers ?? 0)} detail="Membership aktif di lokasi terpilih" icon={<Users size={18} />} />
+        <StatCard label="Check-in hari ini" value={String(checkinsToday ?? 0)} detail="Check-in berhasil hari ini" icon={<ScanLine size={18} />} />
+        <StatCard label="Pendapatan hari ini" value={formatCurrency(revenueToday, currency)} detail={`${todaysTxns?.length ?? 0} transaksi lunas`} icon={<Wallet size={18} />} />
+        <StatCard label="Membership segera berakhir" value={String(expiringSoon ?? 0)} detail="Perlu tindak lanjut perpanjangan" icon={<IdCard size={18} />} />
+      </div>
+
+      <div className="mb-6 grid min-w-0 gap-6 xl:grid-cols-[1.5fr_1fr]">
+        <AnalyticsCard title="Pendapatan hari ini" description="Nilai setiap transaksi lunas hari ini" action={<span className="num text-sm font-semibold text-ink">{formatCurrency(revenueToday, currency)}</span>}>
+          {todaysTxns?.length ? <RevenueChart data={todaysTxns.map((transaction, index) => ({ date: String(index + 1), revenue: Number(transaction.total) }))} /> : <EmptyState title="Belum ada pendapatan hari ini" description="Grafik muncul setelah transaksi pertama lunas." />}
+        </AnalyticsCard>
+        <AnalyticsCard title="Rincian pendapatan" description="Transaksi lunas dari 6 transaksi terbaru">
+          <div className="space-y-6">{["Member", "Walk-in"].map((label) => {
+            const paid = (recentTxns ?? []).filter((transaction) => transaction.status === "paid");
+            const amount = paid.filter((transaction) => label === "Member" ? Boolean(transaction.members) : !transaction.members).reduce((sum, transaction) => sum + Number(transaction.total), 0);
+            const total = paid.reduce((sum, transaction) => sum + Number(transaction.total), 0);
+            return <div key={label}><div className="mb-3 flex flex-wrap justify-between gap-2 text-sm"><span className="text-ink-muted">{label}</span><span className="num font-semibold text-ink">{formatCurrency(amount, currency)}</span></div><div className="h-2 overflow-hidden rounded-full bg-elevated"><div className="h-full rounded-full bg-primary" style={{ width: `${total ? amount / total * 100 : 0}%` }} /></div></div>;
+          })}<Link href="/reports" className="inline-flex items-center gap-2 text-sm text-primary">Buka laporan lengkap <ArrowUpRight size={14} /></Link></div>
+        </AnalyticsCard>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_.85fr]">
@@ -153,7 +171,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_.85fr]">
         <Card>
           <div className="flex items-center justify-between border-b border-line px-5 py-3"><div><p className="text-sm font-medium text-ink">Renewal opportunity</p><p className="mt-0.5 text-xs text-ink-muted">Membership yang perlu ditindaklanjuti</p></div><span className="rounded bg-primary-tint px-2 py-1 text-xs font-medium text-primary">{expiringSoon ?? 0} due</span></div>
-          <div className="flex flex-wrap items-end justify-between gap-4 px-5 py-5"><div><p className="num text-3xl font-semibold text-ink">Rp14.800.000</p><p className="mt-1 text-xs text-ink-muted">Potensi pendapatan</p></div><LinkButton href="/memberships" size="sm">Buka renewal center <ArrowUpRight size={14} /></LinkButton></div>
+          <div className="flex flex-wrap items-end justify-between gap-4 px-5 py-5"><div><p className="num text-3xl font-semibold text-ink">{expiringSoon ?? 0}</p><p className="mt-1 text-xs text-ink-muted">Membership segera berakhir</p></div><LinkButton href="/memberships" size="sm">Tinjau membership <ArrowUpRight size={14} /></LinkButton></div>
         </Card>
         <Card>
           <div className="flex items-center justify-between border-b border-line px-5 py-3"><p className="text-sm font-medium text-ink">Quick actions</p><span className="text-xs text-ink-faint">Operasional</span></div>
